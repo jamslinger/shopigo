@@ -1,4 +1,4 @@
-package shopify
+package shopigo
 
 import (
 	"bytes"
