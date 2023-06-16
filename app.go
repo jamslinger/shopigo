@@ -12,6 +12,10 @@ type App struct {
 	SessionStore
 }
 
+func NewAppConfig() *AppConfig {
+	return &AppConfig{Credentials: &Credentials{}}
+}
+
 type AppConfig struct {
 	*Credentials
 
