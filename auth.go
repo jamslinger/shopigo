@@ -155,7 +155,7 @@ func (a *App) Install(c *gin.Context) {
 		return
 	}
 	DeleteCookies(c, AppStateCookie, AppStateCookie+".sig")
-	if a.ignoreUninstall {
+	if !a.ignoreUninstall {
 		wh := Webhook{
 			Topic:   "app/uninstalled",
 			Address: "/hooks/uninstall",
