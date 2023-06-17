@@ -57,8 +57,7 @@ func (c *Client) RegisterWebhook(wh *Webhook, sess *Session) (id int, err error)
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		log.Error(string(bs))
-		return 0, fmt.Errorf("failed to register webhook, status: %d", resp.StatusCode)
+		return 0, fmt.Errorf("failed to register webhook, status: %d, cause: %s", resp.StatusCode, string(bs))
 	}
 	var whResp = struct {
 		Webhook struct {
