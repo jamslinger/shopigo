@@ -21,9 +21,10 @@ type AppConfig struct {
 
 	HostURL string
 
-	redirectURL   string
-	scopes        string
-	cookieSignKey string
+	redirectURL     string
+	scopes          string
+	cookieSignKey   string
+	ignoreUninstall bool
 }
 
 type Credentials struct {
@@ -105,5 +106,11 @@ func WithRedirectEndpoint(s string) Opt {
 func WithSessionStore(sess SessionStore) Opt {
 	return func(a *App) {
 		a.SessionStore = sess
+	}
+}
+
+func WithIgnoreUninstall() Opt {
+	return func(a *App) {
+		a.ignoreUninstall = true
 	}
 }

@@ -155,15 +155,17 @@ func (a *App) Install(c *gin.Context) {
 		return
 	}
 	DeleteCookies(c, AppStateCookie, AppStateCookie+".sig")
-	wh := Webhook{
-		Topic:   "app/uninstalled",
-		Address: "/hooks/uninstall",
-		Fields:  []string{},
-	}
-	_, err = a.RegisterWebhook(&wh, sess)
-	if err != nil {
-		log.WithField("webhook", wh).
-			Error(fmt.Errorf("failed to register uninstall webhook for %s: %w", shop, err))
+	if a.ignoreUninstall {
+		wh := Webhook{
+			Topic:   "app/uninstalled",
+			Address: "/hooks/uninstall",
+			Fields:  []string{},
+		}
+		_, err = a.RegisterWebhook(&wh, sess)
+		if err != nil {
+			log.WithField("webhook", wh).
+				Error(fmt.Errorf("failed to register uninstall webhook for %s: %w", shop, err))
+		}
 	}
 	c.Redirect(http.StatusFound, fmt.Sprintf("https://%s/admin/apps/%s?%s", shop, a.Credentials.ClientID, c.Request.URL.Query().Encode()))
 }
