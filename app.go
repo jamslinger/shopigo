@@ -21,10 +21,11 @@ type AppConfig struct {
 
 	HostURL string
 
-	redirectURL     string
-	scopes          string
-	cookieSignKey   string
-	ignoreUninstall bool
+	redirectURL       string
+	scopes            string
+	cookieSignKey     string
+	installHook       func()
+	uninstallHookPath string
 }
 
 type Credentials struct {
@@ -109,8 +110,14 @@ func WithSessionStore(sess SessionStore) Opt {
 	}
 }
 
-func WithIgnoreUninstall() Opt {
+func WithInstallHook(hook func()) Opt {
 	return func(a *App) {
-		a.ignoreUninstall = true
+		a.installHook = hook
+	}
+}
+
+func WithUninstallHook(path string) Opt {
+	return func(a *App) {
+		a.uninstallHookPath = path
 	}
 }
