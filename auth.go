@@ -159,7 +159,7 @@ func (a *App) Install(c *gin.Context) {
 		wh := Webhook{
 			Topic:   "app/uninstalled",
 			Address: a.uninstallHookPath,
-			Fields:  []string{},
+			Fields:  []string{"domain"},
 		}
 		_, err = a.RegisterWebhook(&wh, sess)
 		if err != nil {
