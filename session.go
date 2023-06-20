@@ -21,8 +21,8 @@ var InMemSessionStore = &inMemSessionStore{}
 
 type inMemSessionStore map[string]*Session
 
-func (i inMemSessionStore) Get(_ context.Context, ID string) (*Session, error) {
-	sess, ok := i[ID]
+func (i inMemSessionStore) Get(_ context.Context, id string) (*Session, error) {
+	sess, ok := i[id]
 	if !ok {
 		return nil, errors.New("session not found")
 	}
@@ -34,7 +34,7 @@ func (i inMemSessionStore) Store(_ context.Context, session *Session) error {
 	return nil
 }
 
-func (i inMemSessionStore) Delete(_ context.Context, session *Session) error {
-	delete(i, session.ID)
+func (i inMemSessionStore) Delete(_ context.Context, id string) error {
+	delete(i, id)
 	return nil
 }
