@@ -14,6 +14,7 @@ type Session struct {
 type SessionStore interface {
 	Get(ctx context.Context, ID string) (*Session, error)
 	Store(ctx context.Context, session *Session) error
+	Delete(ctx context.Context, ID string) error
 }
 
 var InMemSessionStore = &inMemSessionStore{}
@@ -30,5 +31,10 @@ func (i inMemSessionStore) Get(_ context.Context, ID string) (*Session, error) {
 
 func (i inMemSessionStore) Store(_ context.Context, session *Session) error {
 	i[session.ID] = session
+	return nil
+}
+
+func (i inMemSessionStore) Delete(_ context.Context, session *Session) error {
+	delete(i, session.ID)
 	return nil
 }
