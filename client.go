@@ -1,6 +1,8 @@
 package shopigo
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/Khan/genqlient/graphql"
 	"net/http"
@@ -50,9 +52,9 @@ func (c *Client) ShopURL(shop string, endpoint string) string {
 	return fmt.Sprintf("https://%s/%s", shop, path.Join("admin/api", c.v.String(), endpoint))
 }
 
-func (c *Client) For(shop *Shop) func(req *http.Request) (*http.Response, error) {
+func (c *Client) For(session *Session) func(req *http.Request) (*http.Response, error) {
 	return func(req *http.Request) (*http.Response, error) {
-		req.SetBasicAuth(c.clientID, shop.Token)
+		req.SetBasicAuth(c.clientID, session.AccessToken)
 		return c.Do(req)
 	}
 }
@@ -83,4 +85,27 @@ retry:
 		goto retry
 	}
 	return resp, nil
+}
+
+func (c *Client) Create(session *Session, endpoint string, in any, out any) error {
+	var body bytes.Buffer
+	if err := json.NewEncoder(&body).Encode(in); err != nil {
+		return fmt.Errorf("failed to encode request object: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, c.ShopURL(session.ID, endpoint), &body)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	resp, err := c.For(session)(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("request failed, status: %d", resp.StatusCode)
+	}
+	if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+	return nil
 }
