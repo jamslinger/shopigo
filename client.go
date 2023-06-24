@@ -104,8 +104,10 @@ func (c *Client) Create(session *Session, endpoint string, in any, out any) erro
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("request failed, status: %d", resp.StatusCode)
 	}
-	if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+	if out != nil {
+		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
 	}
 	return nil
 }
