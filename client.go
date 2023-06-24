@@ -97,6 +97,7 @@ func (c *Client) Create(session *Session, endpoint string, in any, out any) erro
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.For(session)(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
