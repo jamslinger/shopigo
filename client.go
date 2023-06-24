@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Khan/genqlient/graphql"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -102,7 +103,8 @@ func (c *Client) Create(session *Session, endpoint string, in any, out any) erro
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("request failed, status: %d", resp.StatusCode)
+		bs, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
 	}
 	if out != nil {
 		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
