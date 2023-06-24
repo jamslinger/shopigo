@@ -88,6 +88,28 @@ retry:
 	return resp, nil
 }
 
+func (c *Client) Get(session *Session, endpoint string, out any) error {
+	req, err := http.NewRequest(http.MethodGet, c.ShopURL(session.ID, endpoint), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	resp, err := c.For(session)(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		bs, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+	}
+	if out != nil {
+		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
+	}
+	return nil
+}
+
 func (c *Client) Create(session *Session, endpoint string, in any, out any) error {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
