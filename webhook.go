@@ -44,7 +44,7 @@ func (c *Client) RegisterWebhook(wh *Webhook, sess *Session) (id int, err error)
 	if err != nil {
 		return 0, err
 	}
-	req, err := http.NewRequest(http.MethodPost, c.ShopURL(sess.ID, "/webhooks.json"), bytes.NewBuffer(body))
+	req, err := http.NewRequest(http.MethodPost, c.ShopURL(sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
 	if err != nil {
 		return 0, err
 	}
