@@ -228,7 +228,7 @@ func MustGetShop(c *gin.Context) string {
 	if !ok {
 		log.Panic("context doesn't hold session")
 	}
-	return s.ID
+	return s.Shop
 }
 
 func isEmbedded(c *gin.Context) bool {
