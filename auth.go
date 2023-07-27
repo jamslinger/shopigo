@@ -75,7 +75,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		a.RespondError(c, http.StatusInternalServerError, err)
 		return
 	}
-	if sess == nil || sess.Shop != c.Query("shop") || !a.sessionValid(sess) {
+	if sess == nil || !a.sessionValid(sess) {
 		a.redirectToAuth(c)
 		return
 	}
