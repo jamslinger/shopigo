@@ -71,7 +71,7 @@ func (c *Client) RegisterWebhook(wh *Webhook, sess *Session) (id int, err error)
 }
 
 func (c *Client) DeleteWebhook(id int, sess *Session) error {
-	req, err := http.NewRequest(http.MethodDelete, c.ShopURL(sess.ID, fmt.Sprintf("/webhooks/%d.json", id)), nil)
+	req, err := http.NewRequest(http.MethodDelete, c.ShopURL(sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), nil)
 	if err != nil {
 		return err
 	}
