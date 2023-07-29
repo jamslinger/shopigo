@@ -3,6 +3,7 @@ package shopigo
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Khan/genqlient/graphql"
 	"io"
@@ -70,7 +71,8 @@ retry:
 	attempt++
 	resp, err := c.http.Do(req)
 	if err != nil {
-		if e, ok := err.(*url.Error); ok && e.Timeout() {
+		var e *url.Error
+		if errors.As(err, &e) && e.Timeout() {
 			if attempt > c.retries {
 				return nil, fmt.Errorf("client.Do(%v): %w", req.URL, err)
 			}
@@ -88,12 +90,12 @@ retry:
 	return resp, nil
 }
 
-func (c *Client) Get(session *Session, endpoint string, out any) error {
-	req, err := http.NewRequest(http.MethodGet, c.ShopURL(session.ID, endpoint), nil)
+func (c *Client) Get(sess *Session, endpoint string, out any) error {
+	req, err := http.NewRequest(http.MethodGet, c.ShopURL(sess.Shop, endpoint), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	resp, err := c.For(session)(req)
+	resp, err := c.For(sess)(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
@@ -110,17 +112,17 @@ func (c *Client) Get(session *Session, endpoint string, out any) error {
 	return nil
 }
 
-func (c *Client) Create(session *Session, endpoint string, in any, out any) error {
+func (c *Client) Create(sess *Session, endpoint string, in any, out any) error {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, c.ShopURL(session.ID, endpoint), &body)
+	req, err := http.NewRequest(http.MethodPost, c.ShopURL(sess.Shop, endpoint), &body)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.For(session)(req)
+	resp, err := c.For(sess)(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
