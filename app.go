@@ -29,7 +29,6 @@ type AppConfig struct {
 	HostURL string
 
 	embedded          bool
-	isOnline          bool
 	authBeginEndpoint string
 	authCallbackPath  string
 	authCallbackURL   string
@@ -150,12 +149,6 @@ func WithUninstallHook(path string) Opt {
 func WithIsEmbedded(e bool) Opt {
 	return func(a *App) {
 		a.embedded = e
-	}
-}
-
-func WithIsOnline(o bool) Opt {
-	return func(a *App) {
-		a.isOnline = o
 	}
 }
 

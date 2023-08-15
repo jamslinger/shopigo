@@ -47,26 +47,26 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 		return
 	}
 	if sess == nil && !exitFrameRegexp.MatchString(c.Request.RequestURI) {
-		log.Info("app installation was not found for shop, redirecting to auth")
+		log.WithField("shop", shop).Debug("app installation was not found for shop, redirecting to auth")
 		a.redirectToAuth(c)
 		return
 	}
 	if a.embedded && !isEmbedded(c) {
 		if a.sessionValid(sess) {
-			log.Info("embedding app...")
+			log.WithField("shop", shop).Debug("embedding app...")
 			a.embedAppIntoShopify(c)
 			return
 		}
 		a.redirectToAuth(c)
 		return
 	}
-	log.Info("app is installed and ready to load")
+	log.WithField("shop", shop).Debug("app is installed and ready to load")
 }
 
 func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 	sessID, err := a.getSessionID(c)
 	if err != nil {
-		log.WithError(err).Error("failed to retrieve session id")
+		log.WithField("shop", c.Query("shop")).WithError(err).Error("failed to retrieve session id")
 		a.redirectToAuth(c)
 		return
 	}
@@ -79,7 +79,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		a.redirectToAuth(c)
 		return
 	}
-	log.Infof("session validated: %s", sess.ID)
+	log.WithField("shop", sess.Shop).Debug("session validated")
 	c.Set(ShopSessionKey, sess)
 }
 
@@ -90,10 +90,8 @@ func (a *App) Begin(c *gin.Context) {
 		return
 	}
 	nonce := strconv.FormatInt(rand.Int63(), 10)
+	// online access tokens: grantOptions = "per-user" (not implemented)
 	var grantOptions string
-	if a.isOnline {
-		grantOptions = "per-user"
-	}
 	query := url.Values{
 		"client_id":       {a.Credentials.ClientID},
 		"scope":           {a.scopes},
