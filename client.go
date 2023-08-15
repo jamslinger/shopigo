@@ -20,8 +20,9 @@ func (v Version) String() string {
 }
 
 const (
-	V_2023_04 Version = "2023-04"
-	V_Latest  Version = V_2023_04
+	V202304 Version = "2023-04"
+	V202307 Version = "2023-07"
+	VLatest Version = V202307
 )
 
 type ClientConfig struct {

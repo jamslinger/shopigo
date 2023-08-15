@@ -65,7 +65,7 @@ func validate(c *AppConfig) error {
 }
 
 func applyDefaults(a *App) {
-	a.v = V_Latest
+	a.v = VLatest
 	a.embedded = true
 	a.authBeginEndpoint = "/auth/begin"
 	a.authCallbackPath = "/auth/install"
@@ -80,10 +80,12 @@ type Opt = func(a *App)
 func WithVersion(v Version) Opt {
 	return func(a *App) {
 		switch v {
-		case V_2023_04:
+		case V202304:
+			a.v = v
+		case V202307:
 			a.v = v
 		default:
-			a.v = V_Latest
+			a.v = VLatest
 		}
 	}
 }
