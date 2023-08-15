@@ -59,7 +59,7 @@ func (a *App) getSessionID(c *gin.Context) (string, error) {
 		if token == "" {
 			return "", os.ErrNotExist
 		}
-		return a.parseJWTSessionID(token, a.isOnline)
+		return a.parseJWTSessionID(token, false)
 	}
 	return a.getSessionIDFromCookie(c)
 }
