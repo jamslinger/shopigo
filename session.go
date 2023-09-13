@@ -54,6 +54,9 @@ func GetOfflineSessionID(shop string) string {
 }
 
 func (a *App) getSessionID(c *gin.Context) (string, error) {
+	if id := a.bypassAuthWithSessID; id != "" {
+		return id, nil
+	}
 	if a.embedded {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 		if token == "" {

@@ -28,14 +28,15 @@ type AppConfig struct {
 
 	HostURL string
 
-	embedded          bool
-	authBeginEndpoint string
-	authCallbackPath  string
-	authCallbackURL   string
-	scopes            string
-	installHook       func()
-	uninstallHookPath string
-	shopRegexp        *regexp.Regexp
+	embedded             bool
+	authBeginEndpoint    string
+	authCallbackPath     string
+	authCallbackURL      string
+	bypassAuthWithSessID string
+	scopes               string
+	installHook          func()
+	uninstallHookPath    string
+	shopRegexp           *regexp.Regexp
 }
 
 type Credentials struct {
@@ -127,6 +128,12 @@ func WithAuthCallbackEndpoint(s string) Opt {
 			panic(err)
 		}
 		a.authCallbackURL = authCallbackURL
+	}
+}
+
+func BypassAuthWithSessionID(s string) Opt {
+	return func(a *App) {
+		a.bypassAuthWithSessID = s
 	}
 }
 
