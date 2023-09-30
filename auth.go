@@ -150,7 +150,7 @@ func (a *App) Install(c *gin.Context) {
 		}
 	}
 	if a.installHook != nil {
-		a.installHook.OnInstall()
+		a.installHook()
 	}
 	c.Redirect(http.StatusFound, "/?"+c.Request.URL.Query().Encode())
 }

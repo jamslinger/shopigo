@@ -55,7 +55,7 @@ func GetOfflineSessionID(shop string) string {
 
 func (a *App) getSessionID(c *gin.Context) (string, error) {
 	if a.sessionIDHook != nil {
-		return a.sessionIDHook.OnRetrieveSessionID()
+		return a.sessionIDHook()
 	}
 	if a.embedded {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
