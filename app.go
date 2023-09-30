@@ -157,13 +157,9 @@ func WithCustomShopDomains(domains ...string) Opt {
 
 type Hook = any
 
-type HookInstall interface {
-	OnInstall()
-}
+type HookInstall = func()
 
-type HookSessionID interface {
-	OnRetrieveSessionID() (string, error)
-}
+type HookSessionID = func() (string, error)
 
 func WithHooks(hooks ...Hook) Opt {
 	return func(a *App) {
