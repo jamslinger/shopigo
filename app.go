@@ -169,6 +169,8 @@ func WithHooks(hooks ...Hook) Opt {
 				a.sessionIDHook = hook.(HookSessionID)
 			case HookInstall:
 				a.installHook = hook.(HookInstall)
+			default:
+				panic(fmt.Sprintf("%T is not a valid hook", hook))
 			}
 		}
 	}
