@@ -25,18 +25,18 @@ func NewAppConfig() *AppConfig {
 
 type AppConfig struct {
 	*Credentials
-
 	HostURL string
 
-	embedded             bool
-	authBeginEndpoint    string
-	authCallbackPath     string
-	authCallbackURL      string
-	bypassAuthWithSessID string
-	scopes               string
-	installHook          func()
-	uninstallHookPath    string
-	shopRegexp           *regexp.Regexp
+	embedded                 bool
+	authBeginEndpoint        string
+	authCallbackPath         string
+	authCallbackURL          string
+	scopes                   string
+	uninstallWebhookEndpoint string
+	shopRegexp               *regexp.Regexp
+
+	installHook   HookInstall
+	sessionIDHook HookSessionID
 }
 
 type Credentials struct {
@@ -131,27 +131,15 @@ func WithAuthCallbackEndpoint(s string) Opt {
 	}
 }
 
-func BypassAuthWithSessionID(s string) Opt {
-	return func(a *App) {
-		a.bypassAuthWithSessID = s
-	}
-}
-
 func WithSessionStore(sess SessionStore) Opt {
 	return func(a *App) {
 		a.SessionStore = sess
 	}
 }
 
-func WithInstallHook(hook func()) Opt {
+func WithUninstallWebhookEndpoint(path string) Opt {
 	return func(a *App) {
-		a.installHook = hook
-	}
-}
-
-func WithUninstallHook(path string) Opt {
-	return func(a *App) {
-		a.uninstallHookPath = path
+		a.uninstallWebhookEndpoint = path
 	}
 }
 
@@ -164,5 +152,28 @@ func WithIsEmbedded(e bool) Opt {
 func WithCustomShopDomains(domains ...string) Opt {
 	return func(a *App) {
 		a.shopRegexp = regexp.MustCompile(fmt.Sprintf("^%s.(%s)/*$", subDomainReg, strings.Join(append(defaultTLDs, domains...), "|")))
+	}
+}
+
+type Hook = any
+
+type HookInstall interface {
+	OnInstall()
+}
+
+type HookSessionID interface {
+	OnRetrieveSessionID() (string, error)
+}
+
+func WithHooks(hooks ...Hook) Opt {
+	return func(a *App) {
+		for _, hook := range hooks {
+			switch hook.(type) {
+			case HookSessionID:
+				a.sessionIDHook = hook.(HookSessionID)
+			case HookInstall:
+				a.installHook = hook.(HookInstall)
+			}
+		}
 	}
 }

@@ -137,10 +137,10 @@ func (a *App) Install(c *gin.Context) {
 		a.RespondError(c, http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
 		return
 	}
-	if a.uninstallHookPath != "" {
+	if a.uninstallWebhookEndpoint != "" {
 		wh := Webhook{
 			Topic:   "app/uninstalled",
-			Address: a.uninstallHookPath,
+			Address: a.uninstallWebhookEndpoint,
 			Fields:  []string{"domain"},
 		}
 		_, err = a.RegisterWebhook(&wh, sess)
@@ -150,7 +150,7 @@ func (a *App) Install(c *gin.Context) {
 		}
 	}
 	if a.installHook != nil {
-		a.installHook()
+		a.installHook.OnInstall()
 	}
 	c.Redirect(http.StatusFound, "/?"+c.Request.URL.Query().Encode())
 }
