@@ -79,7 +79,6 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		a.redirectToAuth(c)
 		return
 	}
-	log.WithField("shop", sess.Shop).Debug("session validated")
 	c.Set(ShopSessionKey, sess)
 }
 
