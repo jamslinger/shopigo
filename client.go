@@ -139,3 +139,13 @@ func (c *Client) Create(sess *Session, endpoint string, in any, out any) error {
 	}
 	return nil
 }
+
+type PageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
+type PaginationResponse[T any] struct {
+	Data     []T      `json:"data"`
+	PageInfo PageInfo `json:"pageInfo"`
+}
