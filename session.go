@@ -2,9 +2,9 @@ package shopigo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"os"
 	"strings"
 	"time"
 )
@@ -60,7 +60,7 @@ func (a *App) getSessionID(c *gin.Context) (string, error) {
 	if a.embedded {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 		if token == "" {
-			return "", os.ErrNotExist
+			return "", errors.New("missing 'Authorization' header")
 		}
 		return a.parseJWTSessionID(token, false)
 	}
