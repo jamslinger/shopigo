@@ -318,6 +318,9 @@ func (a *App) redirectToAuth(c *gin.Context) {
 		return
 	}
 	logger.Debug("app is not embedded, begin auth")
+	query := c.Request.URL.Query()
+	query.Add("shop", shop)
+	c.Request.URL.RawQuery = query.Encode()
 	a.Begin(c)
 }
 
