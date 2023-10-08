@@ -17,15 +17,6 @@ func setShop(c *gin.Context, shop string) {
 	c.Set(metadataKey, d)
 }
 
-func setHost(c *gin.Context, host string) {
-	if _, ok := c.Get(metadataKey); !ok {
-		c.Set(metadataKey, authMetadata{})
-	}
-	d := mustGetMetaData(c)
-	d.host = host
-	c.Set(metadataKey, d)
-}
-
 func setRedirectUri(c *gin.Context, redirectUri string) {
 	if _, ok := c.Get(metadataKey); !ok {
 		c.Set(metadataKey, authMetadata{})
@@ -45,10 +36,6 @@ func mustGetMetaData(c *gin.Context) authMetadata {
 
 func mustGetShop(c *gin.Context) string {
 	return mustGetMetaData(c).shop
-}
-
-func mustGetHost(c *gin.Context) string {
-	return mustGetMetaData(c).host
 }
 
 func mustGetRedirectUri(c *gin.Context) string {

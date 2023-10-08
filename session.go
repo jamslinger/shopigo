@@ -2,10 +2,8 @@ package shopigo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"strings"
 	"time"
 )
 
@@ -53,32 +51,31 @@ func GetOfflineSessionID(shop string) string {
 	return fmt.Sprintf("offline_%s", shop)
 }
 
-func (a *App) getSessionID(c *gin.Context) (string, error) {
-	if a.sessionIDHook != nil {
-		return a.sessionIDHook()
+func MustGetShopSession(c *gin.Context) *Session {
+	sess, ok := c.Get(ShopSessionKey)
+	if !ok {
+		panic("context doesn't hold session")
 	}
-	if a.embedded {
-		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-		if token == "" {
-			return "", errors.New("missing 'Authorization' header")
+	s, ok := sess.(*Session)
+	if !ok {
+		panic("context doesn't hold session")
+
+	}
+	return s
+}
+
+func MustGetShop(c *gin.Context) string {
+	sess, ok := c.Get(ShopSessionKey)
+	if !ok {
+		shop := c.GetHeader(XDomainHeader)
+		if shop == "" {
+			panic("context doesn't hold session")
 		}
-		return a.parseJWTSessionID(token, false)
+		return shop
 	}
-	return a.getSessionIDFromCookie(c)
-}
-
-func (a *App) getSessionIDFromCookie(c *gin.Context) (string, error) {
-	if err := ValidateCookieSignature(c, a.Credentials.ClientSecret, SessionCookie); err != nil {
-		DeleteCookies(c, SessionCookie, SessionCookieSig)
-		return "", err
+	s, ok := sess.(*Session)
+	if !ok {
+		panic("context doesn't hold session")
 	}
-	return c.Cookie(SessionCookie)
-}
-
-func (a *App) sessionValid(sess *Session) bool {
-	if sess == nil {
-		return false
-	}
-	// TODO: do test request against TEST_GRAPHQL_QUERY? kinda strange...
-	return sess.Scopes == a.scopes && sess.AccessToken != "" && (sess.Expires == nil || time.Now().After(*sess.Expires))
+	return s.Shop
 }

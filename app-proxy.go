@@ -4,33 +4,43 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	log "log/slog"
 	"net/http"
 )
 
 func (a *App) VerifyAppProxyRequest(c *gin.Context) {
+	shop := c.Query("shop")
+	logger := log.With(log.String("shop", shop))
+	logger.Debug("verifying app proxy request")
+
 	sorted := fmt.Sprintf("logged_in_customer_id=%spath_prefix=%sshop=%stimestamp=%s",
 		c.Query("logged_in_customer_id"),
 		c.Query("path_prefix"),
-		c.Query("shop"),
+		shop,
 		c.Query("timestamp"),
 	)
 	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
 	hash.Write([]byte(sorted))
 	calcSignature := []byte(hex.EncodeToString(hash.Sum(nil)))
 	signature := []byte(c.Query("signature"))
+
+	logger.Debug("checking hmac signature")
 	if !hmac.Equal(calcSignature, signature) {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("hmac signature mismatch"))
 		return
 	}
-	sess, err := a.SessionStore.Get(c.Request.Context(), c.Query("shop"))
+
+	logger.Debug("retrieving session")
+	sess, err := a.SessionStore.Get(c.Request.Context(), shop)
 	if err != nil {
-		a.RespondError(c, http.StatusInternalServerError, fmt.Errorf("failed to retrieve session for %q: %w", c.Query("shop"), err))
+		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to retrieve session for %q: %w", c.Query("shop"), err))
 		return
 	}
 	if sess == nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("session not found"))
 		return
 	}
 	c.Set(ShopSessionKey, sess)

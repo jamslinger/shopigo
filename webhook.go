@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 	"io"
+	log "log/slog"
 	"net/http"
 	"net/url"
 )
@@ -94,17 +94,17 @@ func (a *App) VerifyWebhook(c *gin.Context) {
 	hash := hmac.New(sha256.New, []byte(a.ClientSecret))
 	bs, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		log.Error(c.AbortWithError(http.StatusInternalServerError, err))
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	if _, err = hash.Write(bs); err != nil {
-		log.Error(c.AbortWithError(http.StatusUnauthorized, err))
+		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(bs))
 	mac := base64.StdEncoding.EncodeToString(hash.Sum(nil))
 	if !hmac.Equal([]byte(mac), []byte(c.GetHeader(XHmacHeader))) {
-		log.Error(c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header")))
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
 		return
 	}
 }

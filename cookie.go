@@ -6,8 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
@@ -42,17 +42,15 @@ func SetSignedCookie(c *gin.Context, key string, name string, val string, path s
 	})
 }
 
-func CompareSignedCookie(c *gin.Context, key string, name string, val string) bool {
+func CompareSignedCookie(c *gin.Context, key string, name string, val string) (bool, error) {
 	cookie, err := c.Cookie(AppStateCookie)
 	if err != nil {
-		log.WithError(err).Error("could not read state cookie")
-		return false
+		return false, fmt.Errorf("could not read state cookie: %w", err)
 	}
 	if err = ValidateCookieSignature(c, key, name); err != nil {
-		log.WithError(err).Error("invalid state cookie")
-		return false
+		return false, fmt.Errorf("invalid state cookie: %w", err)
 	}
-	return cookie == val
+	return cookie == val, nil
 }
 
 func ValidateCookieSignature(c *gin.Context, key string, name string) error {

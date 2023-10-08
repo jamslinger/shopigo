@@ -4,8 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 	"net/url"
 )
 
@@ -38,14 +36,4 @@ func decodeHost(host string) (string, error) {
 	}
 	bs, err := base64.RawURLEncoding.DecodeString(host)
 	return string(bs), err
-}
-
-type ErrorResponse struct {
-	Status int    `json:"status"`
-	Error  string `json:"error"`
-}
-
-func (a *App) RespondError(c *gin.Context, status int, err error) {
-	log.Error(c.Error(err))
-	c.AbortWithStatusJSON(status, ErrorResponse{Status: status, Error: err.Error()})
 }
