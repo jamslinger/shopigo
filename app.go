@@ -155,20 +155,24 @@ func WithCustomShopDomains(domains ...string) Opt {
 	}
 }
 
-type Hook = any
+type Hook interface {
+	hook()
+}
 
-type HookInstall = func()
+type HookInstall func()
+type HookSessionID func() (string, string, error)
 
-type HookSessionID = func() (string, string, error)
+func (hi HookInstall) hook()   {}
+func (hs HookSessionID) hook() {}
 
 func WithHooks(hooks ...Hook) Opt {
 	return func(a *App) {
 		for _, hook := range hooks {
-			switch hook.(type) {
-			case HookSessionID:
-				a.sessionIDHook = hook.(HookSessionID)
+			switch h := hook.(type) {
 			case HookInstall:
-				a.installHook = hook.(HookInstall)
+				a.installHook = h
+			case HookSessionID:
+				a.sessionIDHook = h
 			default:
 				panic(fmt.Sprintf("%T is not a valid hook", hook))
 			}
