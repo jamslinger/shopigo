@@ -32,42 +32,38 @@ const (
 )
 
 func (a *App) EnsureInstalledOnShop(c *gin.Context) {
+	logger := log.With("action", "EnsureInstalledOnShop")
+	if !a.embedded {
+		logger.Debug("app is not embedded, validating session")
+		a.ValidateAuthenticatedSession(c)
+		return
+	}
 	shop, err := a.sanitizeShop(c.Query("shop"))
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	setShop(c, shop)
-
-	logger := log.With(log.String("shop", shop))
+	logger = logger.With(log.String("shop", shop))
 	logger.Debug("check if app is installed")
-
-	if !a.embedded {
-		logger.Debug("app is not embedded, validating session")
-		a.ValidateAuthenticatedSession(c)
-		return
-	}
-
-	logger.Debug("check for valid session")
 	sess, err := a.SessionStore.Get(c.Request.Context(), GetOfflineSessionID(shop))
-	if err != nil {
+	if IsNotFound(err) {
+		if !exitFrameRegexp.MatchString(c.Request.RequestURI) {
+			logger.Debug("no session found, redirecting to auth")
+			a.redirectToAuth(c)
+			return
+		}
+	} else if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-
-	if sess == nil && !exitFrameRegexp.MatchString(c.Request.RequestURI) {
-		logger.Debug("no session found, redirecting to auth")
-		a.redirectToAuth(c)
-		return
-	}
-
-	if !a.sessionValid(sess) {
-		logger.Debug("session is invalid, redirecting to auth")
-		a.redirectToAuth(c)
-	}
-
 	if a.embedded && !isEmbedded(c) {
 		logger.Debug("tried to use embedded app in non-embedded context, attempt embed")
+		if !a.sessionValid(sess) {
+			logger.Debug("session is invalid, redirecting to auth")
+			a.redirectToAuth(c)
+			return
+		}
 		a.embedAppIntoShopify(c)
 		return
 	}
@@ -75,31 +71,39 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 }
 
 func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
-	logger := log.With(log.String("shop", c.Query("shop")))
-
-	logger.Debug("retrieve session ID")
-	sessID, err := a.getSessionID(c)
+	log.Debug("retrieve session ID")
+	sessID, shop, err := a.getSessionID(c)
 	if err != nil {
-		logger.With("error", err).Error("failed to retrieve session ID, redirecting to auth")
-		a.redirectToAuth(c)
+		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
-
-	logger.Debug("check for valid session")
+	log.Debug("retrieve session")
 	sess, err := a.SessionStore.Get(c.Request.Context(), sessID)
-	if err != nil {
+	if IsNotFound(err) {
+		if shop != "" {
+			log.With(log.String("shop", shop)).
+				Debug("session not found but shop in bearer token, redirecting to auth")
+			setShop(c, shop)
+			a.redirectToAuth(c)
+			return
+		}
+		_ = c.AbortWithError(http.StatusUnauthorized, err)
+		return
+	} else if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-
-	if sess == nil {
-		logger.Debug("no session found, redirecting to auth")
+	if shop, err = a.sanitizeShop(c.Query("shop")); err == nil && shop != sess.Shop {
+		log.With(log.String("shop", sess.Shop), log.String("request-shop", shop)).
+			Debug("session found but for different shop as in request, redirecting to auth")
+		setShop(c, shop)
 		a.redirectToAuth(c)
 		return
 	}
-
 	if !a.sessionValid(sess) {
-		logger.Debug("session is invalid, redirecting to auth")
+		log.With(log.String("shop", sess.Shop)).
+			Debug("session is invalid, redirecting to auth")
+		setShop(c, sess.Shop)
 		a.redirectToAuth(c)
 		return
 	}
@@ -202,18 +206,19 @@ func (a *App) Install(c *gin.Context) {
 	c.Redirect(http.StatusFound, redirect)
 }
 
-func (a *App) getSessionID(c *gin.Context) (string, error) {
+func (a *App) getSessionID(c *gin.Context) (string, string, error) {
 	if a.sessionIDHook != nil {
 		return a.sessionIDHook()
 	}
 	if a.embedded {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 		if token == "" {
-			return "", errors.New("missing 'Authorization' header")
+			return "", "", errors.New("missing 'Authorization' header")
 		}
 		return a.parseJWTSessionID(token, false)
 	}
-	return a.getSessionIDFromCookie(c)
+	id, err := a.getSessionIDFromCookie(c)
+	return id, "", err
 }
 
 func (a *App) getSessionIDFromCookie(c *gin.Context) (string, error) {

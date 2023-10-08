@@ -35,12 +35,11 @@ func (a *App) VerifyAppProxyRequest(c *gin.Context) {
 
 	logger.Debug("retrieving session")
 	sess, err := a.SessionStore.Get(c.Request.Context(), shop)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to retrieve session for %q: %w", c.Query("shop"), err))
-		return
-	}
-	if sess == nil {
+	if IsNotFound(err) {
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("session not found"))
+		return
+	} else if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to retrieve session for: %w", err))
 		return
 	}
 	c.Set(ShopSessionKey, sess)

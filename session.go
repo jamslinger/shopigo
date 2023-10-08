@@ -2,6 +2,7 @@ package shopigo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"time"
@@ -24,12 +25,24 @@ type SessionStore interface {
 	Delete(ctx context.Context, ID string) error
 }
 
+var ErrNotFound = errors.New("session not found")
+
+func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, ErrNotFound)
+}
+
 var InMemSessionStore = &inMemSessionStore{}
 
 type inMemSessionStore map[string]*Session
 
 func (i inMemSessionStore) Get(_ context.Context, id string) (*Session, error) {
-	sess, _ := i[id]
+	sess, ok := i[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
 	return sess, nil
 }
 

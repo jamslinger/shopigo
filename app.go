@@ -159,7 +159,7 @@ type Hook = any
 
 type HookInstall = func()
 
-type HookSessionID = func() (string, error)
+type HookSessionID = func() (string, string, error)
 
 func WithHooks(hooks ...Hook) Opt {
 	return func(a *App) {
