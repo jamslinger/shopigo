@@ -110,7 +110,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		log.With(log.String("shop", sess.Shop)).
 			Debug("session is invalid, redirecting to auth")
 		setShop(c, sess.Shop)
-		redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s", a.authBeginEndpoint, shop))
+		redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s", a.authBeginEndpoint, sess.Shop))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
