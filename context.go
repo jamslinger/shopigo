@@ -34,8 +34,20 @@ func mustGetMetaData(c *gin.Context) authMetadata {
 	return d
 }
 
+func getMetaData(c *gin.Context) (md authMetadata) {
+	d, ok := c.Get(metadataKey)
+	if !ok {
+		return
+	}
+	return d.(authMetadata)
+}
+
 func mustGetShop(c *gin.Context) string {
 	return mustGetMetaData(c).shop
+}
+
+func getShop(c *gin.Context) string {
+	return getMetaData(c).shop
 }
 
 func mustGetRedirectUri(c *gin.Context) string {

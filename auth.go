@@ -111,14 +111,17 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 }
 
 func (a *App) Begin(c *gin.Context) {
-	logger := log.With(log.String("shop", c.Query("shop")))
-	logger.Debug("beginning auth")
-
-	shop, err := a.sanitizeShop(c.Query("shop"))
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
-		return
+	shop := getShop(c)
+	if shop == "" {
+		var err error
+		if shop, err = a.sanitizeShop(c.Query("shop")); err != nil {
+			_ = c.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
 	}
+
+	logger := log.With(log.String("shop", shop))
+	logger.Debug("beginning auth")
 
 	nonce := strconv.FormatInt(rand.Int63(), 10)
 	// online access tokens: grantOptions = "per-user" (not implemented)
@@ -318,9 +321,6 @@ func (a *App) redirectToAuth(c *gin.Context) {
 		return
 	}
 	logger.Debug("app is not embedded, begin auth")
-	query := c.Request.URL.Query()
-	query.Add("shop", shop)
-	c.Request.URL.RawQuery = query.Encode()
 	a.Begin(c)
 }
 
