@@ -84,7 +84,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 			log.With(log.String("shop", shop)).
 				Debug("session not found but shop in bearer token, redirecting to auth")
 			setShop(c, shop)
-			a.redirectToAuth(c)
+			a.redirectOutOfApp(c)
 			return
 		}
 		_ = c.AbortWithError(http.StatusUnauthorized, err)
@@ -104,7 +104,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		log.With(log.String("shop", sess.Shop)).
 			Debug("session is invalid, redirecting to auth")
 		setShop(c, sess.Shop)
-		a.redirectToAuth(c)
+		a.redirectOutOfApp(c)
 		return
 	}
 	c.Set(ShopSessionKey, sess)
