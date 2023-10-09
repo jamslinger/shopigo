@@ -138,7 +138,6 @@ func (a *App) Begin(c *gin.Context) {
 
 	redirect := fmt.Sprintf("https://%s/admin/oauth/authorize?%s", shop, query.Encode())
 	logger.With(log.String("redirect", redirect)).Debug("beginning auth, redirecting")
-	c.Header("Access-Control-Allow-Origin", shop)
 	c.Redirect(http.StatusFound, redirect)
 	c.Abort()
 }
@@ -307,7 +306,7 @@ func isEmbedded(c *gin.Context) bool {
 func (a *App) redirectToAuth(c *gin.Context) {
 	shop := mustGetShop(c)
 	logger := log.With(log.String("shop", shop))
-	if isEmbedded(c) {
+	if a.embedded {
 		host, err := a.sanitizeHost(c.Query("host"))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
