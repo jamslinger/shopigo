@@ -139,6 +139,7 @@ func (a *App) Begin(c *gin.Context) {
 	redirect := fmt.Sprintf("https://%s/admin/oauth/authorize?%s", shop, query.Encode())
 	logger.With(log.String("redirect", redirect)).Debug("beginning auth, redirecting")
 	c.Redirect(http.StatusFound, redirect)
+	c.Abort()
 }
 
 func (a *App) Install(c *gin.Context) {
@@ -207,6 +208,7 @@ func (a *App) Install(c *gin.Context) {
 	redirect := "/?" + c.Request.URL.Query().Encode()
 	logger.With(log.String("redirect", redirect)).Debug("app installed, redirecting to app")
 	c.Redirect(http.StatusFound, redirect)
+	c.Abort()
 }
 
 func (a *App) getSessionID(c *gin.Context) (string, string, error) {
@@ -340,6 +342,7 @@ func (a *App) redirectOutOfApp(c *gin.Context) {
 		logger.Debug("app is not embedded, performing direct redirect")
 		c.Redirect(http.StatusFound, mustGetRedirectUri(c))
 	}
+	c.Abort()
 }
 
 func (a *App) appBridgeHeaderRedirect(c *gin.Context) {
@@ -362,4 +365,5 @@ func (a *App) embedAppIntoShopify(c *gin.Context) {
 		return
 	}
 	c.Redirect(http.StatusFound, u)
+	c.Abort()
 }
