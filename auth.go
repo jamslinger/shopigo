@@ -84,6 +84,12 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 			log.With(log.String("shop", shop)).
 				Debug("session not found but shop in bearer token, redirecting to auth")
 			setShop(c, shop)
+			redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s", a.authBeginEndpoint, shop))
+			if err != nil {
+				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
+				return
+			}
+			setRedirectUri(c, redirect)
 			a.redirectOutOfApp(c)
 			return
 		}
@@ -104,6 +110,12 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		log.With(log.String("shop", sess.Shop)).
 			Debug("session is invalid, redirecting to auth")
 		setShop(c, sess.Shop)
+		redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s", a.authBeginEndpoint, shop))
+		if err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
+			return
+		}
+		setRedirectUri(c, redirect)
 		a.redirectOutOfApp(c)
 		return
 	}
