@@ -306,7 +306,7 @@ func isEmbedded(c *gin.Context) bool {
 func (a *App) redirectToAuth(c *gin.Context) {
 	shop := mustGetShop(c)
 	logger := log.With(log.String("shop", shop))
-	if a.embedded {
+	if isEmbedded(c) {
 		host, err := a.sanitizeHost(c.Query("host"))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
