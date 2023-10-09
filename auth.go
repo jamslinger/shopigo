@@ -138,6 +138,7 @@ func (a *App) Begin(c *gin.Context) {
 
 	redirect := fmt.Sprintf("https://%s/admin/oauth/authorize?%s", shop, query.Encode())
 	logger.With(log.String("redirect", redirect)).Debug("beginning auth, redirecting")
+	c.Header("Access-Control-Allow-Origin", shop)
 	c.Redirect(http.StatusFound, redirect)
 	c.Abort()
 }
