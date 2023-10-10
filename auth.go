@@ -84,7 +84,8 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 			log.With(log.String("shop", shop)).
 				Debug("session not found but shop in bearer token, redirecting to auth")
 			setShop(c, shop)
-			redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s", a.authBeginEndpoint, shop))
+			redirect, err := url.JoinPath(a.HostURL,
+				fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {shop}}.Encode()))
 			if err != nil {
 				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 				return
@@ -110,7 +111,8 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		log.With(log.String("shop", sess.Shop)).
 			Debug("session is invalid, redirecting to auth")
 		setShop(c, sess.Shop)
-		redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s", a.authBeginEndpoint, sess.Shop))
+		redirect, err := url.JoinPath(a.HostURL,
+			fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {shop}}.Encode()))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
@@ -324,7 +326,8 @@ func (a *App) redirectToAuth(c *gin.Context) {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		redirect, err := url.JoinPath(a.HostURL, fmt.Sprintf("%s?shop=%s&host=%s", a.authBeginEndpoint, shop, host))
+		redirect, err := url.JoinPath(a.HostURL,
+			fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {shop}, "host": {host}}.Encode()))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
