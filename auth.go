@@ -48,22 +48,26 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 	logger.Debug("check if app is installed")
 	sess, err := a.SessionStore.Get(c.Request.Context(), GetOfflineSessionID(shop))
 	if IsNotFound(err) {
+		logger.Debug("no session found")
 		if !exitFrameRegexp.MatchString(c.Request.RequestURI) {
-			logger.Debug("no session found, redirecting to auth")
+			logger.Debug("not in exitframe, redirecting to auth")
 			a.redirectToAuth(c)
 			return
 		}
+		logger.Debug("we are in an /exitframe request, serve app")
+
 	} else if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	if a.embedded && !isEmbedded(c) {
-		logger.Debug("tried to use embedded app in non-embedded context, attempt embed")
+		logger.Debug("tried to use embedded app in non-embedded context, validate session")
 		if !a.sessionValid(sess) {
 			logger.Debug("session is invalid, redirecting to auth")
 			a.redirectToAuth(c)
 			return
 		}
+		logger.Debug("session validated, attempt embed ")
 		a.embedAppIntoShopify(c)
 		return
 	}
@@ -248,12 +252,46 @@ func (a *App) getSessionIDFromCookie(c *gin.Context) (string, error) {
 	return c.Cookie(SessionCookie)
 }
 
+const graphqlValidateSession = `query shopifyAppShopName {
+  shop {
+    name
+  }
+}`
+
 func (a *App) sessionValid(sess *Session) bool {
 	if sess == nil {
+		log.Debug("session invalid: nil")
 		return false
 	}
-	// TODO: do test request against TEST_GRAPHQL_QUERY? kinda strange...
-	return sess.Scopes == a.scopes && sess.AccessToken != "" && (sess.Expires == nil || time.Now().After(*sess.Expires))
+	if sess.AccessToken == "" {
+		log.Debug("session invalid: empty access token")
+		return false
+	}
+	if sess.Scopes != a.scopes {
+		log.Debug("session invalid: scopes changed")
+		return false
+	}
+	if sess.Expires != nil && time.Now().After(*sess.Expires) {
+		log.Debug("session invalid: expired")
+		return false
+	}
+	a.ShopURL(sess.Shop, "graphql.json")
+	req, err := http.NewRequest(http.MethodPost, a.ShopURL(sess.Shop, "graphql.json"),
+		strings.NewReader(graphqlValidateSession))
+	if err != nil {
+		return false
+	}
+	req.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
+	resp, err := a.Do(req)
+	if err != nil {
+		log.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
+		return false
+	}
+	if resp.StatusCode > 400 {
+		log.Debug("session invalid: token unauthorized")
+		return false
+	}
+	return true
 }
 
 func (a *App) createSession(shop string, state string, token *AccessToken) *Session {
