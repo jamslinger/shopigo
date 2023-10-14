@@ -205,14 +205,14 @@ func (a *App) Install(c *gin.Context) {
 			Fields:  []string{"domain"},
 		}
 		logger.With("webhook", wh).Debug("registering uninstall webhook")
+
+		// A possible error is "already exists" if we only update scopes during
+		// this install. However, shopify makes it really hard to reliably check
+		// for concrete errors, so rather assume this won't fail in case the hook
+		// didn't exist yet.
+		// https://community.shopify.com/c/shopify-apps/api-error-response-types/td-p/2268179
 		if _, err = a.RegisterWebhook(&wh, sess); err != nil {
-			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to register uninstall webhook: %w", err))
-			logger.Debug("rolling back session creating")
-			if err = a.SessionStore.Delete(c.Request.Context(), sess.ID); err != nil {
-				_ = c.Error(fmt.Errorf("failed to delete session: %w", err))
-				return
-			}
-			return
+			logger.With("webhook", wh, "error", err).Debug("registering uninstall webhook failed")
 		}
 	}
 	if a.installHook != nil {

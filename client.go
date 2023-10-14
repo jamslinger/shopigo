@@ -149,3 +149,11 @@ type PaginationResponse[T any] struct {
 	Data     []T      `json:"data"`
 	PageInfo PageInfo `json:"pageInfo"`
 }
+
+type Error struct {
+	Error string `json:"errors"`
+}
+
+type MultiError struct {
+	Errors []string `json:"errors"`
+}
