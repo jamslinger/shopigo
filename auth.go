@@ -67,7 +67,7 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 			a.redirectToAuth(c)
 			return
 		}
-		logger.Debug("session validated, attempt embed ")
+		logger.Debug("session validated, attempt embed")
 		a.embedAppIntoShopify(c)
 		return
 	}
@@ -287,7 +287,7 @@ func (a *App) sessionValid(sess *Session) bool {
 		log.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
 		return false
 	}
-	if resp.StatusCode > 400 {
+	if resp.StatusCode >= 400 {
 		log.Debug("session invalid: token unauthorized")
 		return false
 	}
