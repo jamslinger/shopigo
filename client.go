@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Khan/genqlient/graphql"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,20 +34,11 @@ type ClientConfig struct {
 
 type Client struct {
 	*ClientConfig
-	http    *http.Client
-	GraphQL graphql.Client
+	http *http.Client
 }
 
-func NewShopifyClient(c *ClientConfig) (*Client, error) {
-	cl := &Client{ClientConfig: c, http: &http.Client{}}
-	if c.defaultShop != nil {
-		gqlUrl, err := url.JoinPath(c.defaultShop.Address, "admin/api", c.v.String(), "graphql.json")
-		if err != nil {
-			return nil, err
-		}
-		cl.GraphQL = graphql.NewClient(gqlUrl, cl)
-	}
-	return cl, nil
+func NewShopifyClient(c *ClientConfig) *Client {
+	return &Client{ClientConfig: c, http: &http.Client{}}
 }
 
 func (c *Client) ShopURL(shop string, endpoint string) string {

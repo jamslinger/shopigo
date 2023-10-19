@@ -48,11 +48,10 @@ func NewApp(c *AppConfig, opts ...Opt) (*App, error) {
 	if err := validate(c); err != nil {
 		return nil, err
 	}
-	client, err := NewShopifyClient(&ClientConfig{hostURL: c.HostURL, clientID: c.ClientID})
-	if err != nil {
-		return nil, err
+	app := &App{
+		AppConfig: c,
+		Client:    NewShopifyClient(&ClientConfig{hostURL: c.HostURL, clientID: c.ClientID}),
 	}
-	app := &App{AppConfig: c, Client: client}
 	applyDefaults(app)
 	for _, opt := range opts {
 		opt(app)

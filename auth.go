@@ -1,6 +1,7 @@
 package shopigo
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/hasura/go-graphql-client"
 	log "log/slog"
 	"math/rand"
 	"net/http"
@@ -62,7 +64,7 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 	}
 	if a.embedded && !isEmbedded(c) {
 		logger.Debug("tried to use embedded app in non-embedded context, validate session")
-		if !a.sessionValid(sess) {
+		if !a.sessionValid(c.Request.Context(), sess) {
 			logger.Debug("session is invalid, redirecting to auth")
 			a.redirectToAuth(c)
 			return
@@ -111,7 +113,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		a.redirectToAuth(c)
 		return
 	}
-	if !a.sessionValid(sess) {
+	if !a.sessionValid(c.Request.Context(), sess) {
 		log.With(log.String("shop", sess.Shop)).
 			Debug("session is invalid, redirecting to auth")
 		setShop(c, sess.Shop)
@@ -252,13 +254,7 @@ func (a *App) getSessionIDFromCookie(c *gin.Context) (string, error) {
 	return c.Cookie(SessionCookie)
 }
 
-const graphqlValidateSession = `query shopifyAppShopName {
-  shop {
-    name
-  }
-}`
-
-func (a *App) sessionValid(sess *Session) bool {
+func (a *App) sessionValid(ctx context.Context, sess *Session) bool {
 	if sess == nil {
 		log.Debug("session invalid: nil")
 		return false
@@ -275,20 +271,18 @@ func (a *App) sessionValid(sess *Session) bool {
 		log.Debug("session invalid: expired")
 		return false
 	}
-	a.ShopURL(sess.Shop, "graphql.json")
-	req, err := http.NewRequest(http.MethodPost, a.ShopURL(sess.Shop, "graphql.json"),
-		strings.NewReader(graphqlValidateSession))
-	if err != nil {
-		return false
+	client := graphql.NewClient(a.ShopURL(sess.Shop, "graphql.json"), nil).
+		WithRequestModifier(func(r *http.Request) {
+			r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
+		})
+	var query struct {
+		Shop struct {
+			Name string `json:"name"`
+		} `graphql:"shop"`
 	}
-	req.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
-	resp, err := a.Do(req)
+	err := client.Query(ctx, &query, nil)
 	if err != nil {
 		log.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
-		return false
-	}
-	if resp.StatusCode >= 400 {
-		log.Debug("session invalid: token unauthorized")
 		return false
 	}
 	return true
