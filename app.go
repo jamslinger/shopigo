@@ -2,6 +2,8 @@ package shopigo
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
+	log "log/slog"
 	"net/url"
 	"regexp"
 	"sort"
@@ -11,6 +13,7 @@ import (
 var (
 	defaultTLDs  = []string{"myshopify.com", "shopify.com", "myshopify.io"}
 	subDomainReg = "[a-zA-Z0-9][a-zA-Z0-9-_]*"
+	TraceIDKey   = "KeyTraceID"
 )
 
 type App struct {
@@ -28,6 +31,7 @@ type AppConfig struct {
 	HostURL string
 
 	embedded                 bool
+	withTraceID              bool
 	authBeginEndpoint        string
 	authCallbackPath         string
 	authCallbackURL          string
@@ -75,6 +79,13 @@ func applyDefaults(a *App) {
 	a.shopRegexp = regexp.MustCompile(fmt.Sprintf("^%s.(%s)/*$", subDomainReg, strings.Join(defaultTLDs, "|")))
 }
 
+func (a *App) logger(c *gin.Context) *log.Logger {
+	if a.withTraceID {
+		return log.With("trace", c.MustGet(TraceIDKey))
+	}
+	return log.Default()
+}
+
 type Opt = func(a *App)
 
 func WithVersion(v Version) Opt {
@@ -110,6 +121,12 @@ func WithScopes(s []string) Opt {
 			return scopes[i] < scopes[j]
 		})
 		a.scopes = strings.Join(scopes, ",")
+	}
+}
+
+func WithTraceID() Opt {
+	return func(a *App) {
+		a.withTraceID = true
 	}
 }
 

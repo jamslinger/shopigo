@@ -13,7 +13,7 @@ import (
 
 func (a *App) VerifyAppProxyRequest(c *gin.Context) {
 	shop := c.Query("shop")
-	logger := log.With(log.String("shop", shop))
+	logger := a.logger(c).With(log.String("shop", shop))
 	logger.Debug("verifying app proxy request")
 
 	sorted := fmt.Sprintf("logged_in_customer_id=%spath_prefix=%sshop=%stimestamp=%s",

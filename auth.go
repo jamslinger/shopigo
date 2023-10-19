@@ -1,7 +1,6 @@
 package shopigo
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -34,7 +33,7 @@ const (
 )
 
 func (a *App) EnsureInstalledOnShop(c *gin.Context) {
-	logger := log.With("action", "EnsureInstalledOnShop")
+	logger := a.logger(c).With("action", "EnsureInstalledOnShop")
 	if !a.embedded {
 		logger.Debug("app is not embedded, validating session")
 		a.ValidateAuthenticatedSession(c)
@@ -64,7 +63,7 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 	}
 	if a.embedded && !isEmbedded(c) {
 		logger.Debug("tried to use embedded app in non-embedded context, validate session")
-		if !a.sessionValid(c.Request.Context(), sess) {
+		if !a.sessionValid(c, sess) {
 			logger.Debug("session is invalid, redirecting to auth")
 			a.redirectToAuth(c)
 			return
@@ -77,17 +76,18 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 }
 
 func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
-	log.Debug("retrieve session ID")
+	logger := a.logger(c)
+	logger.Debug("retrieve session ID")
 	sessID, shop, err := a.getSessionID(c)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
-	log.Debug("retrieve session")
+	logger.Debug("retrieve session")
 	sess, err := a.SessionStore.Get(c.Request.Context(), sessID)
 	if IsNotFound(err) {
 		if shop != "" {
-			log.With(log.String("shop", shop)).
+			logger.With(log.String("shop", shop)).
 				Debug("session not found but shop in bearer token, redirecting to auth")
 			setShop(c, shop)
 			redirect, err := url.JoinPath(a.HostURL,
@@ -107,14 +107,14 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		return
 	}
 	if shop, err = a.sanitizeShop(c.Query("shop")); err == nil && shop != sess.Shop {
-		log.With(log.String("shop", sess.Shop), log.String("request-shop", shop)).
+		logger.With(log.String("shop", sess.Shop), log.String("request-shop", shop)).
 			Debug("session found but for different shop as in request, redirecting to auth")
 		setShop(c, shop)
 		a.redirectToAuth(c)
 		return
 	}
-	if !a.sessionValid(c.Request.Context(), sess) {
-		log.With(log.String("shop", sess.Shop)).
+	if !a.sessionValid(c, sess) {
+		logger.With(log.String("shop", sess.Shop)).
 			Debug("session is invalid, redirecting to auth")
 		setShop(c, sess.Shop)
 		redirect, err := url.JoinPath(a.HostURL,
@@ -140,7 +140,7 @@ func (a *App) Begin(c *gin.Context) {
 		}
 	}
 
-	logger := log.With(log.String("shop", shop))
+	logger := a.logger(c).With(log.String("shop", shop))
 	logger.Debug("beginning auth")
 
 	nonce := strconv.FormatInt(rand.Int63(), 10)
@@ -163,7 +163,7 @@ func (a *App) Begin(c *gin.Context) {
 }
 
 func (a *App) Install(c *gin.Context) {
-	logger := log.With(log.String("shop", c.Query("shop")))
+	logger := a.logger(c).With(log.String("shop", c.Query("shop")))
 	logger.Debug("performing install")
 
 	shop, err := a.sanitizeShop(c.Query("shop"))
@@ -254,21 +254,22 @@ func (a *App) getSessionIDFromCookie(c *gin.Context) (string, error) {
 	return c.Cookie(SessionCookie)
 }
 
-func (a *App) sessionValid(ctx context.Context, sess *Session) bool {
+func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
+	logger := a.logger(c)
 	if sess == nil {
-		log.Debug("session invalid: nil")
+		logger.Debug("session invalid: nil")
 		return false
 	}
 	if sess.AccessToken == "" {
-		log.Debug("session invalid: empty access token")
+		logger.Debug("session invalid: empty access token")
 		return false
 	}
 	if sess.Scopes != a.scopes {
-		log.Debug("session invalid: scopes changed")
+		logger.Debug("session invalid: scopes changed")
 		return false
 	}
 	if sess.Expires != nil && time.Now().After(*sess.Expires) {
-		log.Debug("session invalid: expired")
+		logger.Debug("session invalid: expired")
 		return false
 	}
 	client := graphql.NewClient(a.ShopURL(sess.Shop, "graphql.json"), nil).
@@ -280,9 +281,9 @@ func (a *App) sessionValid(ctx context.Context, sess *Session) bool {
 			Name string `json:"name"`
 		} `graphql:"shop"`
 	}
-	err := client.Query(ctx, &query, nil)
+	err := client.Query(c.Request.Context(), &query, nil)
 	if err != nil {
-		log.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
+		logger.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
 		return false
 	}
 	return true
@@ -351,7 +352,7 @@ func isEmbedded(c *gin.Context) bool {
 
 func (a *App) redirectToAuth(c *gin.Context) {
 	shop := mustGetShop(c)
-	logger := log.With(log.String("shop", shop))
+	logger := a.logger(c).With(log.String("shop", shop))
 	if isEmbedded(c) {
 		host, err := a.sanitizeHost(c.Query("host"))
 		if err != nil {
@@ -375,8 +376,7 @@ func (a *App) redirectToAuth(c *gin.Context) {
 
 func (a *App) redirectOutOfApp(c *gin.Context) {
 	shop := mustGetShop(c)
-	logger := log.With(log.String("shop", shop))
-
+	logger := a.logger(c).With(log.String("shop", shop))
 	if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok && token != "" {
 		logger.Debug("bearer token found, performing app bridge header redirect")
 		a.appBridgeHeaderRedirect(c)

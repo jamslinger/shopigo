@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
-	log "log/slog"
 	"net/http"
 	"net/url"
 )
@@ -84,7 +83,6 @@ func (c *Client) DeleteWebhook(id int, sess *Session) error {
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		log.Error(string(bs))
 		return fmt.Errorf("status: %d, err: %s", resp.StatusCode, string(bs))
 	}
 	return nil
