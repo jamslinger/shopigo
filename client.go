@@ -2,6 +2,7 @@ package shopigo
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,13 +77,15 @@ retry:
 		if backoff < 8*time.Second {
 			backoff *= 2
 		}
-		goto retry
+		if attempt < c.retries {
+			goto retry
+		}
 	}
 	return resp, nil
 }
 
-func (c *Client) Get(sess *Session, endpoint string, out any) (int, error) {
-	req, err := http.NewRequest(http.MethodGet, c.ShopURL(sess.Shop, endpoint), nil)
+func (c *Client) Get(ctx context.Context, sess *Session, endpoint string, out any) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.ShopURL(sess.Shop, endpoint), nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -103,12 +106,12 @@ func (c *Client) Get(sess *Session, endpoint string, out any) (int, error) {
 	return resp.StatusCode, nil
 }
 
-func (c *Client) Create(sess *Session, endpoint string, in any, out any) (int, error) {
+func (c *Client) Create(ctx context.Context, sess *Session, endpoint string, in any, out any) (int, error) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, c.ShopURL(sess.Shop, endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ShopURL(sess.Shop, endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
