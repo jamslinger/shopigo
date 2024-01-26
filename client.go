@@ -81,53 +81,53 @@ retry:
 	return resp, nil
 }
 
-func (c *Client) Get(sess *Session, endpoint string, out any) error {
+func (c *Client) Get(sess *Session, endpoint string, out any) (int, error) {
 	req, err := http.NewRequest(http.MethodGet, c.ShopURL(sess.Shop, endpoint), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 	resp, err := c.For(sess)(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return 0, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+		return resp.StatusCode, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
 	}
 	if out != nil {
 		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return fmt.Errorf("failed to decode response: %w", err)
+			return resp.StatusCode, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}
-	return nil
+	return resp.StatusCode, nil
 }
 
-func (c *Client) Create(sess *Session, endpoint string, in any, out any) error {
+func (c *Client) Create(sess *Session, endpoint string, in any, out any) (int, error) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
-		return fmt.Errorf("failed to encode request object: %w", err)
+		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
 	req, err := http.NewRequest(http.MethodPost, c.ShopURL(sess.Shop, endpoint), &body)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.For(sess)(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return 0, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+		return resp.StatusCode, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
 	}
 	if out != nil {
 		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return fmt.Errorf("failed to decode response: %w", err)
+			return resp.StatusCode, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}
-	return nil
+	return resp.StatusCode, nil
 }
 
 type PageInfo struct {
