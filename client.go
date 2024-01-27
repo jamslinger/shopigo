@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"time"
 )
 
@@ -57,14 +60,17 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
+	labels := []string{req.Host, req.URL.Path}
 	backoff := time.Second
 	attempt := 0
 retry:
+	now := time.Now()
 	attempt++
 	resp, err := c.http.Do(req)
 	if err != nil {
 		var e *url.Error
 		if errors.As(err, &e) && e.Timeout() {
+			responseTimeout.WithLabelValues(labels...).Inc()
 			if attempt > c.retries {
 				return nil, fmt.Errorf("client.Do(%v): %w", req.URL, err)
 			}
@@ -72,6 +78,11 @@ retry:
 		}
 		return nil, fmt.Errorf("client.Do(%v): %w", req.URL, err)
 	}
+
+	// measure response size and times.
+	responseSize.WithLabelValues(labels...).Observe(float64(resp.ContentLength))
+	responseTime.WithLabelValues(append(labels, strconv.Itoa(resp.StatusCode))...).Observe(time.Since(now).Seconds())
+
 	if resp.StatusCode == http.StatusTooManyRequests {
 		SleepContext(req.Context(), backoff)
 		if backoff < 8*time.Second {
@@ -150,3 +161,21 @@ type Error struct {
 type MultiError struct {
 	Errors []string `json:"errors"`
 }
+
+var (
+	responseTimeout = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "http_response_timeout_total",
+		Help: "Number of response timeouts",
+	}, []string{"shop", "endpoint"})
+
+	responseTime = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "http_response_time_seconds",
+		Help: "Histogram of response times for HTTP requests",
+	}, []string{"shop", "endpoint", "status"})
+
+	responseSize = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "http_response_size_bytes",
+		Help:    "Histogram of response sizes for HTTP requests",
+		Buckets: []float64{10 << 10, 20 << 10, 30 << 10, 40 << 10, 50 << 10, 75 << 10, 100 << 10, 250 << 10, 500 << 10, 1 << 20, 5 << 20},
+	}, []string{"shop", "endpoint"})
+)
