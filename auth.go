@@ -217,7 +217,7 @@ func (a *App) Install(c *gin.Context) {
 		// for concrete errors, so rather assume this won't fail in case the hook
 		// didn't exist yet.
 		// https://community.shopify.com/c/shopify-apps/api-error-response-types/td-p/2268179
-		if _, err = a.RegisterWebhook(&wh, sess); err != nil {
+		if _, err = a.RegisterWebhook(c.Request.Context(), &wh, sess); err != nil {
 			logger.With("webhook", wh, "error", err).Debug("registering uninstall webhook failed")
 		}
 	}

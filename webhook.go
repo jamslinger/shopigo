@@ -2,6 +2,7 @@ package shopigo
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -37,13 +38,13 @@ type Customer struct {
 	Phone string `json:"phone"`
 }
 
-func (c *Client) RegisterWebhook(wh *Webhook, sess *Session) (id int, err error) {
+func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session) (id int, err error) {
 	wh.Address, err = url.JoinPath(c.hostURL, wh.Address)
 	body, err := json.Marshal(WebhookRequest{Webhook: wh})
 	if err != nil {
 		return 0, err
 	}
-	req, err := http.NewRequest(http.MethodPost, c.ShopURL(sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ShopURL(sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
 	if err != nil {
 		return 0, err
 	}
@@ -69,8 +70,8 @@ func (c *Client) RegisterWebhook(wh *Webhook, sess *Session) (id int, err error)
 	return whResp.Webhook.ID, nil
 }
 
-func (c *Client) DeleteWebhook(id int, sess *Session) error {
-	req, err := http.NewRequest(http.MethodDelete, c.ShopURL(sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), nil)
+func (c *Client) DeleteWebhook(ctx context.Context, id int, sess *Session) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.ShopURL(sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), nil)
 	if err != nil {
 		return err
 	}
