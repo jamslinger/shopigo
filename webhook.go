@@ -25,6 +25,14 @@ type WebhookRequest struct {
 	Webhook *Webhook `json:"webhook"`
 }
 
+type WebhookResponse struct {
+	Webhook WebhookID `json:"webhook"`
+}
+
+type WebhookID struct {
+	ID int `json:"id"`
+}
+
 type Webhook struct {
 	Topic   string   `json:"topic"`
 	Address string   `json:"address"`
@@ -59,11 +67,7 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 		bs, _ := io.ReadAll(resp.Body)
 		return 0, fmt.Errorf("failed to register webhook, status: %d, cause: %s", resp.StatusCode, string(bs))
 	}
-	var whResp = struct {
-		Webhook struct {
-			ID int `json:"id"`
-		} `json:"webhook"`
-	}{}
+	var whResp WebhookResponse
 	if err = json.NewDecoder(resp.Body).Decode(&whResp); err != nil {
 		return 0, err
 	}
