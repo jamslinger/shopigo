@@ -39,8 +39,7 @@ type AppConfig struct {
 	uninstallWebhookEndpoint string
 	shopRegexp               *regexp.Regexp
 
-	installHook   HookInstall
-	sessionIDHook HookSessionID
+	installHook HookInstall
 }
 
 type Credentials struct {
@@ -176,10 +175,8 @@ type Hook interface {
 }
 
 type HookInstall func()
-type HookSessionID func() (string, string, error)
 
-func (hi HookInstall) hook()   {}
-func (hs HookSessionID) hook() {}
+func (hi HookInstall) hook() {}
 
 func WithHooks(hooks ...Hook) Opt {
 	return func(a *App) {
@@ -187,8 +184,6 @@ func WithHooks(hooks ...Hook) Opt {
 			switch h := hook.(type) {
 			case HookInstall:
 				a.installHook = h
-			case HookSessionID:
-				a.sessionIDHook = h
 			default:
 				panic(fmt.Sprintf("%T is not a valid hook", hook))
 			}

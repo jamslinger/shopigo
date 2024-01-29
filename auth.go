@@ -232,9 +232,6 @@ func (a *App) Install(c *gin.Context) {
 }
 
 func (a *App) getSessionID(c *gin.Context) (string, string, error) {
-	if a.sessionIDHook != nil {
-		return a.sessionIDHook()
-	}
 	if a.embedded {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 		if token == "" {
