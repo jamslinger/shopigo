@@ -9,14 +9,14 @@ import (
 )
 
 type Session struct {
-	ID               string
-	Shop             string
-	State            string
-	IsOnline         bool
-	AccessToken      string
-	Scopes           string
-	Expires          *time.Time
-	OnlineAccessInfo *OnlineAccessInfo
+	ID               string            `json:"id"`
+	Shop             string            `json:"shop"`
+	State            string            `json:"state"`
+	IsOnline         bool              `json:"is_online"`
+	AccessToken      string            `json:"access_token"`
+	Scopes           string            `json:"scopes"`
+	Expires          *time.Time        `json:"expires"`
+	OnlineAccessInfo *OnlineAccessInfo `json:"online_access_info"`
 }
 
 type SessionStore interface {
