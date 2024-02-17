@@ -32,6 +32,7 @@ type AppConfig struct {
 
 	embedded                 bool
 	withTraceID              bool
+	insecure                 bool
 	authBeginEndpoint        string
 	authCallbackPath         string
 	authCallbackURL          string
@@ -126,6 +127,12 @@ func WithScopes(s []string) Opt {
 func WithTraceID() Opt {
 	return func(a *App) {
 		a.withTraceID = true
+	}
+}
+
+func WithInsecureClient() Opt {
+	return func(a *App) {
+		a.Client.insecure = true
 	}
 }
 

@@ -32,6 +32,7 @@ type ClientConfig struct {
 	v           Version
 	clientID    string
 	hostURL     string
+	insecure    bool
 	retries     int
 	defaultShop *Shop
 }
@@ -46,7 +47,11 @@ func NewShopifyClient(c *ClientConfig) *Client {
 }
 
 func (c *Client) ShopURL(shop string, endpoint string) string {
-	return fmt.Sprintf("https://%s/%s", shop, path.Join("admin/api", c.v.String(), endpoint))
+	protocol := "https"
+	if c.insecure {
+		protocol = "http"
+	}
+	return fmt.Sprintf("%s://%s/%s", protocol, shop, path.Join("admin/api", c.v.String(), endpoint))
 }
 
 func (c *Client) For(session *Session) func(req *http.Request) (*http.Response, error) {
