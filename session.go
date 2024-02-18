@@ -77,6 +77,22 @@ func MustGetShopSession(c *gin.Context) *Session {
 	return s
 }
 
+func MustGetSessionID(c *gin.Context) string {
+	sess, ok := c.Get(ShopSessionKey)
+	if ok {
+		if s, ok := sess.(*Session); ok {
+			return s.ID
+		} else {
+			panic("context doesn't hold session")
+		}
+	}
+	shop := c.GetHeader(XDomainHeader)
+	if shop == "" {
+		panic("context doesn't hold session")
+	}
+	return GetOfflineSessionID(shop)
+}
+
 func MustGetShop(c *gin.Context) string {
 	sess, ok := c.Get(ShopSessionKey)
 	if !ok {
