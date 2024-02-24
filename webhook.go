@@ -97,7 +97,7 @@ func (c *Client) DeleteWebhook(ctx context.Context, id int, sess *Session) error
 }
 
 func (a *App) VerifyWebhook(c *gin.Context) {
-	hash := hmac.New(sha256.New, []byte(a.ClientSecret))
+	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
 	bs, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)

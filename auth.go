@@ -27,12 +27,10 @@ const (
 	ShopSessionKey    = "ShopifyShopSessionKey"
 	AppStateCookie    = "shopify_app_state"
 	AppStateCookieSig = "shopify_app_state.sig"
-	SessionCookie     = "shopify_app_session"
-	SessionCookieSig  = "shopify_app_session.sig"
 )
 
 func (a *App) EnsureInstalledOnShop(c *gin.Context) {
-	logger := a.logger(c).With("action", "EnsureInstalledOnShop")
+	logger := a.Logger.With("action", "EnsureInstalledOnShop")
 	shop, err := a.sanitizeShop(c.Query("shop"))
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, err)
@@ -70,7 +68,7 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 }
 
 func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
-	logger := a.logger(c)
+	logger := a.Logger
 	logger.Debug("retrieve session ID")
 	sessID, shop, err := a.getSessionID(c)
 	if err != nil {
@@ -134,7 +132,7 @@ func (a *App) Begin(c *gin.Context) {
 		}
 	}
 
-	logger := a.logger(c).With(log.String("shop", shop))
+	logger := a.Logger.With(log.String("shop", shop))
 	logger.Debug("beginning auth")
 
 	nonce := strconv.FormatInt(rand.Int63(), 10)
@@ -154,7 +152,7 @@ func (a *App) Begin(c *gin.Context) {
 }
 
 func (a *App) Install(c *gin.Context) {
-	logger := a.logger(c).With(log.String("shop", c.Query("shop")))
+	logger := a.Logger.With(log.String("shop", c.Query("shop")))
 	logger.Debug("performing install")
 
 	shop, err := a.sanitizeShop(c.Query("shop"))
@@ -230,9 +228,9 @@ func (a *App) getSessionID(c *gin.Context) (string, string, error) {
 }
 
 func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
-	logger := a.logger(c)
+	logger := a.Logger
 	if sess == nil {
-		logger.Debug("session invalid: nil")
+		a.Debug("session invalid: nil")
 		return false
 	}
 	if sess.AccessToken == "" {
@@ -307,7 +305,7 @@ func isEmbedded(c *gin.Context) bool {
 
 func (a *App) redirectToAuth(c *gin.Context) {
 	shop := mustGetShop(c)
-	logger := a.logger(c).With(log.String("shop", shop))
+	logger := a.Logger.With(log.String("shop", shop))
 	if isEmbedded(c) {
 		host, err := a.sanitizeHost(c.Query("host"))
 		if err != nil {
@@ -331,7 +329,7 @@ func (a *App) redirectToAuth(c *gin.Context) {
 
 func (a *App) redirectOutOfApp(c *gin.Context) {
 	shop := mustGetShop(c)
-	logger := a.logger(c).With(log.String("shop", shop))
+	logger := a.Logger.With(log.String("shop", shop))
 	if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok && token != "" {
 		logger.Debug("bearer token found, performing app bridge header redirect")
 		a.appBridgeHeaderRedirect(c)

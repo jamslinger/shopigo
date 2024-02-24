@@ -2,7 +2,6 @@ package shopigo
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	log "log/slog"
 	"net/url"
 	"regexp"
@@ -20,30 +19,7 @@ type App struct {
 	*AppConfig
 	*Client
 	SessionStore
-}
-
-func NewAppConfig() *AppConfig {
-	return &AppConfig{Credentials: &Credentials{}}
-}
-
-type AppConfig struct {
-	*Credentials
-	HostURL string
-
-	withTraceID              bool
-	authBeginEndpoint        string
-	authCallbackPath         string
-	authCallbackURL          string
-	scopes                   string
-	uninstallWebhookEndpoint string
-	shopRegexp               *regexp.Regexp
-
-	installHook HookInstall
-}
-
-type Credentials struct {
-	ClientID     string
-	ClientSecret string
+	*log.Logger
 }
 
 func NewApp(c *AppConfig, opts ...Opt) (*App, error) {
@@ -52,7 +28,7 @@ func NewApp(c *AppConfig, opts ...Opt) (*App, error) {
 	}
 	app := &App{
 		AppConfig: c,
-		Client:    NewShopifyClient(&ClientConfig{hostURL: c.HostURL, clientID: c.ClientID}),
+		Client:    NewShopifyClient(&ClientConfig{hostURL: c.HostURL, clientID: c.Credentials.ClientID}),
 	}
 	applyDefaults(app)
 	for _, opt := range opts {
@@ -62,25 +38,26 @@ func NewApp(c *AppConfig, opts ...Opt) (*App, error) {
 }
 
 func validate(c *AppConfig) error {
-	_, err := url.Parse(c.HostURL)
-	return err
+	if c == nil {
+		return fmt.Errorf("please provide a configuration")
+	} else if c.Credentials == nil || c.Credentials.ClientID == "" || c.Credentials.ClientSecret == "" {
+		return fmt.Errorf("please provide valid app credentials")
+	}
+	if _, err := url.Parse(c.HostURL); err != nil {
+		return fmt.Errorf("please provide a valid host URL: %w", err)
+	}
+	return nil
 }
 
 func applyDefaults(a *App) {
 	a.v = VLatest
+	a.Logger = log.Default()
 	a.authBeginEndpoint = "/auth/begin"
 	a.authCallbackPath = "/auth/install"
 	authCallbackURL, _ := url.JoinPath(a.HostURL, a.authCallbackPath)
 	a.authCallbackURL = authCallbackURL
 	a.SessionStore = InMemSessionStore
 	a.shopRegexp = regexp.MustCompile(fmt.Sprintf("^%s.(%s)/*$", subDomainReg, strings.Join(defaultTLDs, "|")))
-}
-
-func (a *App) logger(c *gin.Context) *log.Logger {
-	if a.withTraceID {
-		return log.With("trace", c.MustGet(TraceIDKey))
-	}
-	return log.Default()
 }
 
 type Opt = func(a *App)
@@ -91,6 +68,15 @@ func WithVersion(v Version) Opt {
 			a.v = v
 		} else {
 			a.v = VLatest
+		}
+	}
+}
+
+// WithLogger sets the app's logger. If nil, log.Default() will be used.
+func WithLogger(logger *log.Logger) Opt {
+	return func(a *App) {
+		if logger != nil {
+			a.Logger = logger
 		}
 	}
 }
@@ -115,12 +101,6 @@ func WithScopes(s []string) Opt {
 			return scopes[i] < scopes[j]
 		})
 		a.scopes = strings.Join(scopes, ",")
-	}
-}
-
-func WithTraceID() Opt {
-	return func(a *App) {
-		a.withTraceID = true
 	}
 }
 
