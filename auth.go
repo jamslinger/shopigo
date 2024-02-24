@@ -33,11 +33,6 @@ const (
 
 func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 	logger := a.logger(c).With("action", "EnsureInstalledOnShop")
-	if !a.embedded {
-		logger.Debug("app is not embedded, validating session")
-		a.ValidateAuthenticatedSession(c)
-		return
-	}
 	shop, err := a.sanitizeShop(c.Query("shop"))
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, err)
@@ -60,7 +55,7 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	if a.embedded && !isEmbedded(c) {
+	if !isEmbedded(c) {
 		logger.Debug("tried to use embedded app in non-embedded context, validate session")
 		if !a.sessionValid(c, sess) {
 			logger.Debug("session is invalid, redirecting to auth")
@@ -190,10 +185,9 @@ func (a *App) Install(c *gin.Context) {
 	}
 
 	logger.Debug("creating new session")
+
 	sess := a.createSession(shop, state, token)
-	if !a.embedded {
-		SetSignedCookie(c, a.Credentials.ClientSecret, SessionCookie, sess.ID, "/", sess.Expires)
-	}
+
 	err = a.SessionStore.Store(c.Request.Context(), sess)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
@@ -228,23 +222,11 @@ func (a *App) Install(c *gin.Context) {
 }
 
 func (a *App) getSessionID(c *gin.Context) (string, string, error) {
-	if a.embedded {
-		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-		if token == "" {
-			return "", "", errors.New("missing 'Authorization' header")
-		}
-		return a.parseJWTSessionID(token)
+	token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+	if token == "" {
+		return "", "", errors.New("missing 'Authorization' header")
 	}
-	id, err := a.getSessionIDFromCookie(c)
-	return id, "", err
-}
-
-func (a *App) getSessionIDFromCookie(c *gin.Context) (string, error) {
-	if err := ValidateCookieSignature(c, a.Credentials.ClientSecret, SessionCookie); err != nil {
-		DeleteCookies(c, SessionCookie, SessionCookieSig)
-		return "", err
-	}
-	return c.Cookie(SessionCookie)
+	return a.parseJWTSessionID(token)
 }
 
 func (a *App) sessionValid(c *gin.Context, sess *Session) bool {

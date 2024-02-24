@@ -30,7 +30,6 @@ type AppConfig struct {
 	*Credentials
 	HostURL string
 
-	embedded                 bool
 	withTraceID              bool
 	authBeginEndpoint        string
 	authCallbackPath         string
@@ -69,7 +68,6 @@ func validate(c *AppConfig) error {
 
 func applyDefaults(a *App) {
 	a.v = VLatest
-	a.embedded = true
 	a.authBeginEndpoint = "/auth/begin"
 	a.authCallbackPath = "/auth/install"
 	authCallbackURL, _ := url.JoinPath(a.HostURL, a.authCallbackPath)
@@ -161,12 +159,6 @@ func WithSessionStore(sess SessionStore) Opt {
 func WithUninstallWebhookEndpoint(path string) Opt {
 	return func(a *App) {
 		a.uninstallWebhookEndpoint = path
-	}
-}
-
-func WithIsEmbedded(e bool) Opt {
-	return func(a *App) {
-		a.embedded = e
 	}
 }
 
