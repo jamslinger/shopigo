@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/hasura/go-graphql-client"
 	log "log/slog"
 	"math/rand"
@@ -144,14 +143,11 @@ func (a *App) Begin(c *gin.Context) {
 	logger.Debug("beginning auth")
 
 	nonce := strconv.FormatInt(rand.Int63(), 10)
-	// online access tokens: grantOptions = "per-user" (not implemented)
-	var grantOptions string
 	query := url.Values{
-		"client_id":       {a.Credentials.ClientID},
-		"scope":           {a.scopes},
-		"redirect_uri":    {a.authCallbackURL},
-		"state":           {nonce},
-		"grant_options[]": {grantOptions},
+		"client_id":    {a.Credentials.ClientID},
+		"scope":        {a.scopes},
+		"redirect_uri": {a.authCallbackURL},
+		"state":        {nonce},
 	}
 	expires := time.Now().Add(time.Hour)
 	SetSignedCookie(c, a.Credentials.ClientSecret, AppStateCookie, nonce, a.authCallbackPath, &expires)
@@ -237,7 +233,7 @@ func (a *App) getSessionID(c *gin.Context) (string, string, error) {
 		if token == "" {
 			return "", "", errors.New("missing 'Authorization' header")
 		}
-		return a.parseJWTSessionID(token, false)
+		return a.parseJWTSessionID(token)
 	}
 	id, err := a.getSessionIDFromCookie(c)
 	return id, "", err
@@ -287,33 +283,13 @@ func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
 }
 
 func (a *App) createSession(shop string, state string, token *AccessToken) *Session {
-	var isOnline bool
-	if token.OnlineAccessInfo != nil && token.OnlineAccessInfo.User != nil {
-		isOnline = true
-	}
-	var exp *time.Time
-	var sessID string
-
-	if isOnline {
-		expires := time.Now().Add(time.Duration(token.OnlineAccessInfo.Exp * int64(time.Second)))
-		exp = &expires
-		if a.embedded {
-			sessID = GetOnlineSessionID(shop, strconv.Itoa(token.OnlineAccessInfo.User.ID))
-		} else {
-			sessID = uuid.New().String()
-		}
-	} else {
-		sessID = GetOfflineSessionID(shop)
-	}
 	return &Session{
-		ID:               sessID,
-		Shop:             shop,
-		State:            state,
-		IsOnline:         isOnline,
-		AccessToken:      token.Token,
-		Scopes:           token.Scopes,
-		Expires:          exp,
-		OnlineAccessInfo: token.OnlineAccessInfo,
+		ID:          GetOfflineSessionID(shop),
+		Shop:        shop,
+		State:       state,
+		AccessToken: token.Token,
+		Scopes:      token.Scopes,
+		Expires:     &time.Time{}, // TODO: should this expire?
 	}
 }
 

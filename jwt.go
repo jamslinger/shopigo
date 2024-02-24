@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (a *App) parseJWTSessionID(token string, isOnline bool) (string, string, error) {
+func (a *App) parseJWTSessionID(token string) (string, string, error) {
 	tok, err := jwt.Parse(token, func(_ *jwt.Token) (interface{}, error) {
 		return []byte(a.Credentials.ClientSecret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
@@ -60,12 +60,5 @@ func (a *App) parseJWTSessionID(token string, isOnline bool) (string, string, er
 		return "", "", errors.New("invalid client id")
 	}
 	shop := strings.ReplaceAll(destURL.Hostname(), "https://", "")
-	if isOnline {
-		user, err := tok.Claims.GetSubject()
-		if err != nil {
-			return "", "", err
-		}
-		return GetOnlineSessionID(shop, user), shop, nil
-	}
 	return GetOfflineSessionID(shop), shop, nil
 }

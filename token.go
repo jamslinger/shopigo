@@ -10,26 +10,8 @@ import (
 )
 
 type AccessToken struct {
-	Token             string `json:"access_token"`
-	Scopes            string `json:"scope"`
-	*OnlineAccessInfo `json:",omitempty"`
-}
-
-type OnlineAccessInfo struct {
-	Exp       int64  `json:"expires_in"`
-	UserScope string `json:"associated_user_scope"`
-	User      *User  `json:"associated_user,omitempty"`
-}
-
-type User struct {
-	ID            int    `json:"id"`
-	FirstName     string `json:"first_name"`
-	LastName      string `json:"last_name"`
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
-	AccountOwner  bool   `json:"account_owner"`
-	Locale        string `json:"locale"`
-	Collaborator  bool   `json:"collaborator"`
+	Token  string `json:"access_token"`
+	Scopes string `json:"scope"`
 }
 
 func (a *App) AccessToken(shop string, code string) (*AccessToken, error) {

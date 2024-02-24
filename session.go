@@ -9,14 +9,12 @@ import (
 )
 
 type Session struct {
-	ID               string            `json:"id"`
-	Shop             string            `json:"shop"`
-	State            string            `json:"state"`
-	IsOnline         bool              `json:"is_online"`
-	AccessToken      string            `json:"access_token"`
-	Scopes           string            `json:"scopes"`
-	Expires          *time.Time        `json:"expires"`
-	OnlineAccessInfo *OnlineAccessInfo `json:"online_access_info"`
+	ID          string     `json:"id"`
+	Shop        string     `json:"shop"`
+	State       string     `json:"state"`
+	AccessToken string     `json:"access_token"`
+	Scopes      string     `json:"scopes"`
+	Expires     *time.Time `json:"expires"`
 }
 
 type SessionStore interface {
@@ -54,10 +52,6 @@ func (i inMemSessionStore) Store(_ context.Context, session *Session) error {
 func (i inMemSessionStore) Delete(_ context.Context, id string) error {
 	delete(i, id)
 	return nil
-}
-
-func GetOnlineSessionID(shop string, user string) string {
-	return fmt.Sprintf("%s_%s", shop, user)
 }
 
 func GetOfflineSessionID(shop string) string {
