@@ -24,7 +24,7 @@ type OnlineAccessInfo struct {
 type User struct {
 	ID            int    `json:"id"`
 	FirstName     string `json:"first_name"`
-	LastName      string `json:"'last_name'"`
+	LastName      string `json:"last_name"`
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
 	AccountOwner  bool   `json:"account_owner"`

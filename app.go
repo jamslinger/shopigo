@@ -32,7 +32,6 @@ type AppConfig struct {
 
 	embedded                 bool
 	withTraceID              bool
-	insecure                 bool
 	authBeginEndpoint        string
 	authCallbackPath         string
 	authCallbackURL          string

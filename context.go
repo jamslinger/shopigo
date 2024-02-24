@@ -4,8 +4,7 @@ import "github.com/gin-gonic/gin"
 
 type authMetadata struct {
 	shop        string
-	host        string
-	redirectUri string
+	redirectURI string
 }
 
 func setShop(c *gin.Context, shop string) {
@@ -17,12 +16,12 @@ func setShop(c *gin.Context, shop string) {
 	c.Set(metadataKey, d)
 }
 
-func setRedirectUri(c *gin.Context, redirectUri string) {
+func setRedirectURI(c *gin.Context, redirectURI string) {
 	if _, ok := c.Get(metadataKey); !ok {
 		c.Set(metadataKey, authMetadata{})
 	}
 	d := mustGetMetaData(c)
-	d.redirectUri = redirectUri
+	d.redirectURI = redirectURI
 	c.Set(metadataKey, d)
 }
 
@@ -50,6 +49,6 @@ func getShop(c *gin.Context) string {
 	return getMetaData(c).shop
 }
 
-func mustGetRedirectUri(c *gin.Context) string {
-	return mustGetMetaData(c).redirectUri
+func mustGetRedirectURI(c *gin.Context) string {
+	return mustGetMetaData(c).redirectURI
 }

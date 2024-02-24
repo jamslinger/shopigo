@@ -96,7 +96,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 				return
 			}
-			setRedirectUri(c, redirect)
+			setRedirectURI(c, redirect)
 			a.redirectOutOfApp(c)
 			return
 		}
@@ -123,7 +123,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
 		}
-		setRedirectUri(c, redirect)
+		setRedirectURI(c, redirect)
 		a.redirectOutOfApp(c)
 		return
 	}
@@ -362,7 +362,7 @@ func (a *App) redirectToAuth(c *gin.Context) {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
 		}
-		setRedirectUri(c, redirect)
+		setRedirectURI(c, redirect)
 		logger.With(log.String("redirect", redirect)).Debug("redirecting out of app")
 		a.redirectOutOfApp(c)
 		return
@@ -380,11 +380,11 @@ func (a *App) redirectOutOfApp(c *gin.Context) {
 	} else if isEmbedded(c) {
 		logger.Debug("app is embedded, performing exitiframe redirect")
 		query := c.Request.URL.Query()
-		query.Add("redirectUri", mustGetRedirectUri(c))
+		query.Add("redirectURI", mustGetRedirectURI(c))
 		c.Redirect(http.StatusFound, "/exitiframe?"+query.Encode())
 	} else {
 		logger.Debug("app is not embedded, performing direct redirect")
-		c.Redirect(http.StatusFound, mustGetRedirectUri(c))
+		c.Redirect(http.StatusFound, mustGetRedirectURI(c))
 	}
 	c.Abort()
 }
@@ -393,7 +393,7 @@ func (a *App) appBridgeHeaderRedirect(c *gin.Context) {
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "X-Shopify-Api-Request-Failure-Reauthorize")
 	c.Writer.Header().Add("Access-Control-Expose-Headers", "X-Shopify-Api-Request-Failure-Reauthorize-Url")
 	c.Header("X-Shopify-API-Request-Failure-Reauthorize", "1")
-	c.Header("X-Shopify-API-Request-Failure-Reauthorize-Url", mustGetRedirectUri(c))
+	c.Header("X-Shopify-API-Request-Failure-Reauthorize-Url", mustGetRedirectURI(c))
 	c.AbortWithStatus(http.StatusForbidden)
 }
 

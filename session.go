@@ -82,9 +82,8 @@ func MustGetSessionID(c *gin.Context) string {
 	if ok {
 		if s, ok := sess.(*Session); ok {
 			return s.ID
-		} else {
-			panic("context doesn't hold session")
 		}
+		panic("context doesn't hold session")
 	}
 	shop := c.GetHeader(XDomainHeader)
 	if shop == "" {

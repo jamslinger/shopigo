@@ -10,7 +10,7 @@ import (
 )
 
 func (a *App) parseJWTSessionID(token string, isOnline bool) (string, string, error) {
-	tok, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+	tok, err := jwt.Parse(token, func(_ *jwt.Token) (interface{}, error) {
 		return []byte(a.Credentials.ClientSecret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
 	if err != nil {

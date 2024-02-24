@@ -48,6 +48,9 @@ type Customer struct {
 
 func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session) (id int, err error) {
 	wh.Address, err = url.JoinPath(c.hostURL, wh.Address)
+	if err != nil {
+		return 0, err
+	}
 	body, err := json.Marshal(WebhookRequest{Webhook: wh})
 	if err != nil {
 		return 0, err

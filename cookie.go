@@ -69,7 +69,7 @@ func ValidateCookieSignature(c *gin.Context, key string, name string) error {
 	}
 	hash := hmac.New(sha256.New, []byte(key))
 	hash.Write([]byte(cookie))
-	if bytes.Compare(hash.Sum(nil), mac) != 0 {
+	if !bytes.Equal(hash.Sum(nil), mac) {
 		return errors.New("invalid cookie signature")
 	}
 	return nil
