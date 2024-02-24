@@ -87,12 +87,9 @@ type Opt = func(a *App)
 
 func WithVersion(v Version) Opt {
 	return func(a *App) {
-		switch v {
-		case V202304:
+		if v != "" {
 			a.v = v
-		case V202307:
-			a.v = v
-		default:
+		} else {
 			a.v = VLatest
 		}
 	}
