@@ -336,7 +336,7 @@ func (a *App) redirectOutOfApp(c *gin.Context) {
 	} else if isEmbedded(c) {
 		logger.Debug("app is embedded, performing exitiframe redirect")
 		query := c.Request.URL.Query()
-		query.Add("redirectURI", mustGetRedirectURI(c))
+		query.Add("redirectUri", mustGetRedirectURI(c))
 		c.Redirect(http.StatusFound, "/exitiframe?"+query.Encode())
 	} else {
 		logger.Debug("app is not embedded, performing direct redirect")
