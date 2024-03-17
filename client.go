@@ -151,6 +151,33 @@ func (c *Client) Create(ctx context.Context, sess *Session, endpoint string, in 
 	return resp.StatusCode, nil
 }
 
+func (c *Client) Update(ctx context.Context, sess *Session, endpoint string, in any, out any) (int, error) {
+	var body bytes.Buffer
+	if err := json.NewEncoder(&body).Encode(in); err != nil {
+		return 0, fmt.Errorf("failed to encode request object: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.ShopURL(sess.Shop, endpoint), &body)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := c.For(sess)(req)
+	if err != nil {
+		return 0, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		bs, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+	}
+	if out != nil {
+		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
+			return resp.StatusCode, fmt.Errorf("failed to decode response: %w", err)
+		}
+	}
+	return resp.StatusCode, nil
+}
+
 type PageInfo struct {
 	HasNextPage bool   `json:"hasNextPage"`
 	EndCursor   string `json:"endCursor"`
