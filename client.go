@@ -181,6 +181,7 @@ func (c *Client) Update(ctx context.Context, sess *Session, endpoint string, in 
 type PageInfo struct {
 	HasNextPage bool   `json:"hasNextPage"`
 	EndCursor   string `json:"endCursor"`
+	Total       int    `json:"total"`
 }
 
 type PaginationResponse[T any] struct {
