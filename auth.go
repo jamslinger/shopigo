@@ -186,10 +186,12 @@ func (a *App) Install(c *gin.Context) {
 
 	sess := a.createSession(shop, state, token)
 
-	err = a.SessionStore.Store(c.Request.Context(), sess)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
-		return
+	var cleanup Cleanup
+	if a.installHook != nil {
+		if cleanup, err = a.installHook(a, sess); err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("install hook failed: %w", err))
+			return
+		}
 	}
 
 	if a.uninstallWebhookEndpoint != "" {
@@ -199,16 +201,24 @@ func (a *App) Install(c *gin.Context) {
 			Fields:  []string{"domain"},
 		}
 		logger.With("webhook", wh).Debug("registering uninstall webhook")
-
-		// A possible error is "already exists" if we only update scopes during
-		// this install. However, shopify makes it really hard to reliably check
-		// for concrete errors, so rather assume this won't fail in case the hook
-		// didn't exist yet.
-		// https://community.shopify.com/c/shopify-apps/api-error-response-types/td-p/2268179
 		if _, err = a.RegisterWebhook(c.Request.Context(), &wh, sess); err != nil {
-			logger.With("webhook", wh, "error", err).Debug("registering uninstall webhook failed")
+			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("registering uninstall webhook failed: %w", err))
+			if cleanup != nil {
+				cleanup(a, sess)
+			}
+			return
 		}
 	}
+
+	err = a.SessionStore.Store(c.Request.Context(), sess)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
+		if cleanup != nil {
+			cleanup(a, sess)
+		}
+		return
+	}
+
 	c.Set(ShopSessionKey, sess)
 	redirect := "/?" + c.Request.URL.Query().Encode()
 	logger.With(log.String("redirect", redirect)).Debug("app installed, redirecting to app")

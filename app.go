@@ -149,10 +149,24 @@ type Hook interface {
 	hook()
 }
 
+// HookInstall is a function that will be called after an installation,
+// right before the session is stored. If the hook returns a non-nil
+// error, no session will be stored and the installation is aborted.
+// Otherwise, the installation is continued. If storing the session
+// fails subsequently, Cleanup is called to allow to clean up anything
+// that was done in HookInstall, like unregistering webhooks.
+type HookInstall func(a *App, sess *Session) (Cleanup, error)
+
+type Cleanup func(a *App, sess *Session)
+
+func (hi HookInstall) hook() {}
+
 func WithHooks(hooks ...Hook) Opt {
 	return func(a *App) {
 		for _, hook := range hooks {
-			switch hook.(type) {
+			switch h := hook.(type) {
+			case HookInstall:
+				a.installHook = h
 			default:
 				panic(fmt.Sprintf("%T is not a valid hook", hook))
 			}

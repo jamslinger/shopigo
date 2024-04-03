@@ -34,19 +34,49 @@ type WebhookID struct {
 }
 
 type Webhook struct {
+	ID      int      `json:"id"`
 	Topic   string   `json:"topic"`
 	Address string   `json:"address"`
 	Fields  []string `json:"fields,omitempty"`
 	Format  string   `json:"format,omitempty"`
 }
 
-type Customer struct {
-	ID    int    `json:"id"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
+type WebhooksResponse struct {
+	Webhooks []*Webhook `json:"webhooks"`
+}
+
+func (c *Client) GetWebhooks(ctx context.Context, sess *Session) ([]*Webhook, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.ShopURL(sess.Shop, "/webhooks.json"), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add(XAccessToken, sess.AccessToken)
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		bs, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to retrieve webhooks, status: %d, cause: %s", resp.StatusCode, string(bs))
+	}
+	var whs WebhooksResponse
+	if err = json.NewDecoder(resp.Body).Decode(&whs); err != nil {
+		return nil, err
+	}
+	return whs.Webhooks, nil
 }
 
 func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session) (id int, err error) {
+	whs, err := c.GetWebhooks(ctx, sess)
+	if err != nil {
+		return 0, err
+	}
+	for i := range whs {
+		if whs[i].Topic == wh.Topic {
+			return whs[i].ID, nil
+		}
+	}
 	wh.Address, err = url.JoinPath(c.hostURL, wh.Address)
 	if err != nil {
 		return 0, err
