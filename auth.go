@@ -209,6 +209,7 @@ func (a *App) Install(c *gin.Context) {
 			logger.With("webhook", wh, "error", err).Debug("registering uninstall webhook failed")
 		}
 	}
+	c.Set(ShopSessionKey, sess)
 	redirect := "/?" + c.Request.URL.Query().Encode()
 	logger.With(log.String("redirect", redirect)).Debug("app installed, redirecting to app")
 	c.Redirect(http.StatusFound, redirect)
