@@ -13,7 +13,6 @@ type AppConfig struct {
 	scopes                   string
 	uninstallWebhookEndpoint string
 	shopRegexp               *regexp.Regexp
-	installHook              HookInstall
 }
 
 type Credentials struct {

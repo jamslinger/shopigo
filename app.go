@@ -149,16 +149,10 @@ type Hook interface {
 	hook()
 }
 
-type HookInstall func()
-
-func (hi HookInstall) hook() {}
-
 func WithHooks(hooks ...Hook) Opt {
 	return func(a *App) {
 		for _, hook := range hooks {
-			switch h := hook.(type) {
-			case HookInstall:
-				a.installHook = h
+			switch hook.(type) {
 			default:
 				panic(fmt.Sprintf("%T is not a valid hook", hook))
 			}
