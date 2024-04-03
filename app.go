@@ -1,6 +1,7 @@
 package shopigo
 
 import (
+	"context"
 	"fmt"
 	log "log/slog"
 	"net/url"
@@ -155,9 +156,9 @@ type Hook interface {
 // Otherwise, the installation is continued. If storing the session
 // fails subsequently, Cleanup is called to allow to clean up anything
 // that was done in HookInstall, like unregistering webhooks.
-type HookInstall func(a *App, sess *Session) (Cleanup, error)
+type HookInstall func(ctx context.Context, a *App, sess *Session) (Cleanup, error)
 
-type Cleanup func(a *App, sess *Session)
+type Cleanup func(ctx context.Context, a *App, sess *Session)
 
 func (hi HookInstall) hook() {}
 

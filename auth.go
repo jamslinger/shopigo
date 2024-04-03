@@ -188,7 +188,7 @@ func (a *App) Install(c *gin.Context) {
 
 	var cleanup Cleanup
 	if a.installHook != nil {
-		if cleanup, err = a.installHook(a, sess); err != nil {
+		if cleanup, err = a.installHook(c.Request.Context(), a, sess); err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("install hook failed: %w", err))
 			return
 		}
@@ -204,7 +204,7 @@ func (a *App) Install(c *gin.Context) {
 		if _, err = a.RegisterWebhook(c.Request.Context(), &wh, sess); err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("registering uninstall webhook failed: %w", err))
 			if cleanup != nil {
-				cleanup(a, sess)
+				cleanup(c.Request.Context(), a, sess)
 			}
 			return
 		}
@@ -214,7 +214,7 @@ func (a *App) Install(c *gin.Context) {
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
 		if cleanup != nil {
-			cleanup(a, sess)
+			cleanup(c.Request.Context(), a, sess)
 		}
 		return
 	}
