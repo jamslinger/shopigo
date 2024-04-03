@@ -72,9 +72,10 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 	if err != nil {
 		return 0, err
 	}
+	var id int
 	for i := range whs {
 		if whs[i].Topic == wh.Topic {
-			return whs[i].ID, nil
+			id = whs[i].ID
 		}
 	}
 	wh.Address, err = url.JoinPath(c.hostURL, wh.Address)
@@ -85,9 +86,17 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 	if err != nil {
 		return 0, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ShopURL(sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
-	if err != nil {
-		return 0, err
+	var req *http.Request
+	if id == 0 {
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.ShopURL(sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		req, err = http.NewRequestWithContext(ctx, http.MethodPut, c.ShopURL(sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), bytes.NewBuffer(body))
+		if err != nil {
+			return 0, err
+		}
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add(XAccessToken, sess.AccessToken)
