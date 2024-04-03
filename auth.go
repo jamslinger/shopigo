@@ -212,7 +212,6 @@ func (a *App) Install(c *gin.Context) {
 	redirect := "/?" + c.Request.URL.Query().Encode()
 	logger.With(log.String("redirect", redirect)).Debug("app installed, redirecting to app")
 	c.Redirect(http.StatusFound, redirect)
-	c.Abort()
 }
 
 func (a *App) getSessionID(c *gin.Context) (string, string, error) {
