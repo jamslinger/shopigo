@@ -156,7 +156,7 @@ type Hook interface {
 // Otherwise, the installation is continued. If storing the session
 // fails subsequently, Cleanup is called to allow to clean up anything
 // that was done in HookInstall, like unregistering webhooks.
-type HookInstall func(ctx context.Context, a *App, sess *Session) (Cleanup, error)
+type HookInstall func(ctx context.Context, a *App, sess *Session) error
 
 type Cleanup func(ctx context.Context, a *App, sess *Session)
 

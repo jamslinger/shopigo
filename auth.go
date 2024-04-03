@@ -183,40 +183,36 @@ func (a *App) Install(c *gin.Context) {
 	}
 
 	logger.Debug("creating new session")
-
 	sess := a.createSession(shop, state, token)
 
-	var cleanup Cleanup
 	if a.installHook != nil {
-		if cleanup, err = a.installHook(c.Request.Context(), a, sess); err != nil {
+		logger.Debug("calling install hook")
+		if err = a.installHook(c.Request.Context(), a, sess); err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("install hook failed: %w", err))
 			return
 		}
-	}
-
-	if a.uninstallWebhookEndpoint != "" {
-		wh := Webhook{
-			Topic:   "app/uninstalled",
-			Address: a.uninstallWebhookEndpoint,
-			Fields:  []string{"domain"},
-		}
-		logger.With("webhook", wh).Debug("registering uninstall webhook")
-		if _, err = a.RegisterWebhook(c.Request.Context(), &wh, sess); err != nil {
-			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("registering uninstall webhook failed: %w", err))
-			if cleanup != nil {
-				cleanup(c.Request.Context(), a, sess)
+	} else {
+		var id int
+		if a.uninstallWebhookEndpoint != "" {
+			wh := Webhook{
+				Topic:   "app/uninstalled",
+				Address: a.uninstallWebhookEndpoint,
+				Fields:  []string{"domain"},
 			}
+			logger.With("webhook", wh).Debug("registering uninstall webhook")
+			if id, err = a.RegisterWebhook(c.Request.Context(), &wh, sess); err != nil {
+				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("registering uninstall webhook failed: %w", err))
+				return
+			}
+		}
+		err = a.SessionStore.Store(c.Request.Context(), sess)
+		if err != nil {
+			if id != 0 {
+				err = errors.Join(err, a.DeleteWebhook(c.Request.Context(), id, sess))
+			}
+			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
 			return
 		}
-	}
-
-	err = a.SessionStore.Store(c.Request.Context(), sess)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
-		if cleanup != nil {
-			cleanup(c.Request.Context(), a, sess)
-		}
-		return
 	}
 
 	c.Set(ShopSessionKey, sess)
