@@ -72,7 +72,6 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 	if err != nil {
 		return 0, err
 	}
-	var id int
 	for i := range whs {
 		if whs[i].Topic == wh.Topic {
 			id = whs[i].ID
