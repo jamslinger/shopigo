@@ -52,6 +52,9 @@ func NewShopifyClientProvider(c ClientConfig) *ClientProvider {
 type Client interface {
 	Endpoint(endpoint string) string
 	Do(req *http.Request) (*http.Response, error)
+	Get(ctx context.Context, endpoint string, out any) (int, error)
+	Create(ctx context.Context, endpoint string, in any, out any) (int, error)
+	Update(ctx context.Context, endpoint string, in any, out any) (int, error)
 }
 
 func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {
