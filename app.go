@@ -18,7 +18,7 @@ var (
 
 type App struct {
 	*AppConfig
-	*Client
+	*ClientProvider
 	SessionStore
 	*log.Logger
 }
@@ -28,8 +28,8 @@ func NewApp(c *AppConfig, opts ...Opt) (*App, error) {
 		return nil, err
 	}
 	app := &App{
-		AppConfig: c,
-		Client:    NewShopifyClient(&ClientConfig{hostURL: c.HostURL, clientID: c.Credentials.ClientID}),
+		AppConfig:      c,
+		ClientProvider: NewShopifyClientProvider(ClientConfig{hostURL: c.HostURL, clientID: c.Credentials.ClientID}),
 	}
 	applyDefaults(app)
 	for _, opt := range opts {
@@ -107,7 +107,7 @@ func WithScopes(s []string) Opt {
 
 func WithInsecureClient() Opt {
 	return func(a *App) {
-		a.Client.insecure = true
+		a.ClientProvider.insecure = true
 	}
 }
 

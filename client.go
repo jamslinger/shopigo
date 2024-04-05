@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"golang.org/x/time/rate"
 	"io"
 	"net/http"
 	"net/url"
@@ -39,31 +40,43 @@ type ClientConfig struct {
 	defaultShop *Shop
 }
 
-type Client struct {
+type ClientProvider struct {
 	*ClientConfig
 	http *http.Client
 }
 
-func NewShopifyClient(c *ClientConfig) *Client {
-	return &Client{ClientConfig: c, http: &http.Client{}}
+func NewShopifyClientProvider(c ClientConfig) *ClientProvider {
+	return &ClientProvider{ClientConfig: &c, http: &http.Client{}}
 }
 
-func (c *Client) ShopURL(shop string, endpoint string) string {
+type Client interface {
+	Endpoint(endpoint string) string
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {
+	if sess == nil {
+		panic("must provide client session")
+	}
+	return &client{config: p.ClientConfig, http: p.http, sess: sess, limiter: limiter}
+}
+
+type client struct {
+	config  *ClientConfig
+	http    *http.Client
+	sess    *Session
+	limiter *rate.Limiter
+}
+
+func (c *client) Endpoint(endpoint string) string {
 	protocol := "https"
-	if c.insecure {
+	if c.config.insecure {
 		protocol = "http"
 	}
-	return fmt.Sprintf("%s://%s/%s", protocol, shop, path.Join("admin/api", c.v.String(), endpoint))
+	return fmt.Sprintf("%s://%s/%s", protocol, c.sess.Shop, path.Join("admin/api", c.config.v.String(), endpoint))
 }
 
-func (c *Client) For(session *Session) func(req *http.Request) (*http.Response, error) {
-	return func(req *http.Request) (*http.Response, error) {
-		req.SetBasicAuth(c.clientID, session.AccessToken)
-		return c.Do(req)
-	}
-}
-
-func (c *Client) Do(req *http.Request) (*http.Response, error) {
+func (c *client) Do(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
@@ -73,12 +86,17 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 retry:
 	now := time.Now()
 	attempt++
+	if c.limiter != nil {
+		if err := c.limiter.Wait(req.Context()); err != nil {
+			return nil, err
+		}
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		var e *url.Error
 		if errors.As(err, &e) && e.Timeout() {
 			responseTimeout.WithLabelValues(labels...).Inc()
-			if attempt > c.retries {
+			if attempt > c.config.retries {
 				return nil, fmt.Errorf("client.Do(%v): %w", req.URL, err)
 			}
 			goto retry
@@ -95,19 +113,19 @@ retry:
 		if backoff < 8*time.Second {
 			backoff *= 2
 		}
-		if attempt < c.retries {
+		if attempt < c.config.retries {
 			goto retry
 		}
 	}
 	return resp, nil
 }
 
-func (c *Client) Get(ctx context.Context, sess *Session, endpoint string, out any) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.ShopURL(sess.Shop, endpoint), nil)
+func (c *client) Get(ctx context.Context, endpoint string, out any) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Endpoint(endpoint), nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
-	resp, err := c.For(sess)(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("request failed: %w", err)
 	}
@@ -124,17 +142,17 @@ func (c *Client) Get(ctx context.Context, sess *Session, endpoint string, out an
 	return resp.StatusCode, nil
 }
 
-func (c *Client) Create(ctx context.Context, sess *Session, endpoint string, in any, out any) (int, error) {
+func (c *client) Create(ctx context.Context, endpoint string, in any, out any) (int, error) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ShopURL(sess.Shop, endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Endpoint(endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.For(sess)(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("request failed: %w", err)
 	}
@@ -151,17 +169,17 @@ func (c *Client) Create(ctx context.Context, sess *Session, endpoint string, in 
 	return resp.StatusCode, nil
 }
 
-func (c *Client) Update(ctx context.Context, sess *Session, endpoint string, in any, out any) (int, error) {
+func (c *client) Update(ctx context.Context, endpoint string, in any, out any) (int, error) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.ShopURL(sess.Shop, endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Endpoint(endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.For(sess)(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("request failed: %w", err)
 	}
