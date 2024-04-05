@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hasura/go-graphql-client"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/time/rate"
@@ -70,6 +71,14 @@ func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {
 		panic("must provide client session")
 	}
 	return &client{config: p.ClientConfig, http: p.http, sess: sess, limiter: limiter}
+}
+
+func (p *ClientProvider) GraphQLClient(sess *Session, limiter *rate.Limiter) *graphql.Client {
+	cl := p.Client(sess, limiter)
+	return graphql.NewClient(cl.Endpoint("graphql.json"), cl).
+		WithRequestModifier(func(r *http.Request) {
+			r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
+		})
 }
 
 type client struct {
