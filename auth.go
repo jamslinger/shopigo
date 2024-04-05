@@ -200,7 +200,7 @@ func (a *App) Install(c *gin.Context) {
 				Fields:  []string{"domain"},
 			}
 			logger.With("webhook", wh).Debug("registering uninstall webhook")
-			if id, err = a.RegisterWebhook(c.Request.Context(), &wh, sess); err != nil {
+			if id, err = a.Client(sess, nil).RegisterWebhook(c.Request.Context(), &wh); err != nil {
 				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("registering uninstall webhook failed: %w", err))
 				return
 			}
@@ -208,7 +208,7 @@ func (a *App) Install(c *gin.Context) {
 		err = a.SessionStore.Store(c.Request.Context(), sess)
 		if err != nil {
 			if id != 0 {
-				err = errors.Join(err, a.DeleteWebhook(c.Request.Context(), id, sess))
+				err = errors.Join(err, a.Client(sess, nil).DeleteWebhook(c.Request.Context(), id))
 			}
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
 			return
@@ -247,7 +247,8 @@ func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
 		logger.Debug("session invalid: expired")
 		return false
 	}
-	client := graphql.NewClient(a.ShopURL(sess.Shop, "graphql.json"), nil).
+	cl := a.Client(sess, nil)
+	client := graphql.NewClient(cl.Endpoint("graphql.json"), cl).
 		WithRequestModifier(func(r *http.Request) {
 			r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
 		})
