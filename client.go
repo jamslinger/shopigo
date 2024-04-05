@@ -55,6 +55,14 @@ type Client interface {
 	Get(ctx context.Context, endpoint string, out any) (int, error)
 	Create(ctx context.Context, endpoint string, in any, out any) (int, error)
 	Update(ctx context.Context, endpoint string, in any, out any) (int, error)
+
+	WebhookClient
+}
+
+type WebhookClient interface {
+	GetWebhooks(ctx context.Context) ([]*Webhook, error)
+	RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err error)
+	DeleteWebhook(ctx context.Context, id int) error
 }
 
 func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {

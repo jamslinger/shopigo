@@ -45,12 +45,12 @@ type WebhooksResponse struct {
 	Webhooks []*Webhook `json:"webhooks"`
 }
 
-func (c *Client) GetWebhooks(ctx context.Context, sess *Session) ([]*Webhook, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.ShopURL(sess.Shop, "/webhooks.json"), nil)
+func (c *client) GetWebhooks(ctx context.Context) ([]*Webhook, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Endpoint("/webhooks.json"), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add(XAccessToken, sess.AccessToken)
+	req.Header.Add(XAccessToken, c.sess.AccessToken)
 	resp, err := c.Do(req)
 	if err != nil {
 		return nil, err
@@ -67,8 +67,8 @@ func (c *Client) GetWebhooks(ctx context.Context, sess *Session) ([]*Webhook, er
 	return whs.Webhooks, nil
 }
 
-func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session) (id int, err error) {
-	whs, err := c.GetWebhooks(ctx, sess)
+func (c *client) RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err error) {
+	whs, err := c.GetWebhooks(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -77,7 +77,7 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 			id = whs[i].ID
 		}
 	}
-	wh.Address, err = url.JoinPath(c.hostURL, wh.Address)
+	wh.Address, err = url.JoinPath(c.config.hostURL, wh.Address)
 	if err != nil {
 		return 0, err
 	}
@@ -87,18 +87,18 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 	}
 	var req *http.Request
 	if id == 0 {
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.ShopURL(sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.Endpoint("/webhooks.json"), bytes.NewBuffer(body))
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		req, err = http.NewRequestWithContext(ctx, http.MethodPut, c.ShopURL(sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), bytes.NewBuffer(body))
+		req, err = http.NewRequestWithContext(ctx, http.MethodPut, c.Endpoint(fmt.Sprintf("/webhooks/%d.json", id)), bytes.NewBuffer(body))
 		if err != nil {
 			return 0, err
 		}
 	}
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add(XAccessToken, sess.AccessToken)
+	req.Header.Add(XAccessToken, c.sess.AccessToken)
 	resp, err := c.Do(req)
 	if err != nil {
 		return 0, err
@@ -115,13 +115,13 @@ func (c *Client) RegisterWebhook(ctx context.Context, wh *Webhook, sess *Session
 	return whResp.Webhook.ID, nil
 }
 
-func (c *Client) DeleteWebhook(ctx context.Context, id int, sess *Session) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.ShopURL(sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), nil)
+func (c *client) DeleteWebhook(ctx context.Context, id int) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Endpoint(fmt.Sprintf("/webhooks/%d.json", id)), nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add(XAccessToken, sess.AccessToken)
+	req.Header.Add(XAccessToken, c.sess.AccessToken)
 	resp, err := c.Do(req)
 	if err != nil {
 		return err
