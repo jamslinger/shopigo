@@ -97,6 +97,7 @@ func (c *client) Endpoint(endpoint string) string {
 }
 
 func (c *client) Do(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(c.config.clientID, c.sess.AccessToken)
 	if req.Body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
