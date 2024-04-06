@@ -138,9 +138,9 @@ retry:
 	var err error
 	switch typ {
 	case gqlQuery:
-		err = c.gql.Query(ctx, &v, variables)
+		bs, err = c.gql.QueryRaw(ctx, v, variables)
 	case gqlMutation:
-		err = c.gql.Mutate(ctx, &v, variables)
+		bs, err = c.gql.MutateRaw(ctx, v, variables)
 	default:
 		panic("unsupported graphql type")
 	}
