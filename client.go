@@ -134,19 +134,17 @@ retry:
 	attempt++
 	now := time.Now()
 
-	var bs []byte
 	var err error
 	switch typ {
 	case gqlQuery:
-		bs, err = c.gql.QueryRaw(ctx, v, variables)
+		err = c.gql.Query(ctx, v, variables)
 	case gqlMutation:
-		bs, err = c.gql.MutateRaw(ctx, v, variables)
+		err = c.gql.Mutate(ctx, v, variables)
 	default:
 		panic("unsupported graphql type")
 	}
 
-	// measure response size and times.
-	responseSize.WithLabelValues(labels...).Observe(float64(len(bs)))
+	// measure response times.
 	responseTime.WithLabelValues(append(labels, "200")...).Observe(time.Since(now).Seconds())
 
 	if err != nil {
