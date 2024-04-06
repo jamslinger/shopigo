@@ -46,7 +46,7 @@ type WebhooksResponse struct {
 }
 
 func (c *client) GetWebhooks(ctx context.Context) ([]*Webhook, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Endpoint("/webhooks.json"), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.config.Endpoint(c.sess.Shop, "/webhooks.json"), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +87,14 @@ func (c *client) RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err 
 	}
 	var req *http.Request
 	if id == 0 {
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.Endpoint("/webhooks.json"), bytes.NewBuffer(body))
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost,
+			c.config.Endpoint(c.sess.Shop, "/webhooks.json"), bytes.NewBuffer(body))
 		if err != nil {
 			return 0, err
 		}
 	} else {
-		req, err = http.NewRequestWithContext(ctx, http.MethodPut, c.Endpoint(fmt.Sprintf("/webhooks/%d.json", id)), bytes.NewBuffer(body))
+		req, err = http.NewRequestWithContext(ctx, http.MethodPut,
+			c.config.Endpoint(c.sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), bytes.NewBuffer(body))
 		if err != nil {
 			return 0, err
 		}
@@ -116,7 +118,8 @@ func (c *client) RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err 
 }
 
 func (c *client) DeleteWebhook(ctx context.Context, id int) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Endpoint(fmt.Sprintf("/webhooks/%d.json", id)), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
+		c.config.Endpoint(c.sess.Shop, fmt.Sprintf("/webhooks/%d.json", id)), nil)
 	if err != nil {
 		return err
 	}

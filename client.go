@@ -41,6 +41,14 @@ type ClientConfig struct {
 	defaultShop *Shop
 }
 
+func (c *ClientConfig) Endpoint(shop string, endpoint string) string {
+	protocol := "https"
+	if c.insecure {
+		protocol = "http"
+	}
+	return fmt.Sprintf("%s://%s/%s", protocol, shop, path.Join("admin/api", c.v.String(), endpoint))
+}
+
 type ClientProvider struct {
 	*ClientConfig
 	http *http.Client
@@ -51,7 +59,6 @@ func NewShopifyClientProvider(c ClientConfig) *ClientProvider {
 }
 
 type Client interface {
-	Endpoint(endpoint string) string
 	Do(req *http.Request) (*http.Response, error)
 	Get(ctx context.Context, endpoint string, out any) (int, error)
 	Create(ctx context.Context, endpoint string, in any, out any) (int, error)
@@ -66,6 +73,11 @@ type WebhookClient interface {
 	DeleteWebhook(ctx context.Context, id int) error
 }
 
+type GraphQLClient interface {
+	Mutate(ctx context.Context, name string, v any, variables map[string]any) error
+	Query(ctx context.Context, name string, v any, variables map[string]any) error
+}
+
 func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {
 	if sess == nil {
 		panic("must provide client session")
@@ -73,12 +85,88 @@ func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {
 	return &client{config: p.ClientConfig, http: p.http, sess: sess, limiter: limiter}
 }
 
-func (p *ClientProvider) GraphQLClient(sess *Session, limiter *rate.Limiter) *graphql.Client {
-	cl := p.Client(sess, limiter)
-	return graphql.NewClient(cl.Endpoint("graphql.json"), cl).
-		WithRequestModifier(func(r *http.Request) {
-			r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
-		})
+func (p *ClientProvider) GraphQLClient(sess *Session, limiter *rate.Limiter) GraphQLClient {
+	if sess == nil {
+		panic("must provide client session")
+	}
+	return &graphQLClient{
+		config: p.ClientConfig,
+		gql: graphql.NewClient(p.ClientConfig.Endpoint(sess.Shop, "graphql.json"), p.http).
+			WithRequestModifier(func(r *http.Request) {
+				r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
+			}),
+		sess:    sess,
+		limiter: limiter}
+}
+
+type graphQLClient struct {
+	config  *ClientConfig
+	gql     *graphql.Client
+	sess    *Session
+	limiter *rate.Limiter
+}
+
+type gqlType int
+
+const (
+	gqlQuery gqlType = iota
+	gqlMutation
+)
+
+func (c *graphQLClient) Query(ctx context.Context, name string, v any, variables map[string]any) error {
+	return c.do(ctx, gqlQuery, name, v, variables)
+}
+
+func (c *graphQLClient) Mutate(ctx context.Context, name string, v any, variables map[string]any) error {
+	return c.do(ctx, gqlMutation, name, v, variables)
+}
+
+func (c *graphQLClient) do(ctx context.Context, typ gqlType, name string, v any, variables map[string]any) error {
+	labels := []string{c.sess.Shop, "graphql/" + name}
+	backoff := time.Second
+	attempt := 0
+retry:
+	if c.limiter != nil {
+		if err := c.limiter.Wait(ctx); err != nil {
+			return err
+		}
+	}
+	attempt++
+	now := time.Now()
+
+	var bs []byte
+	var err error
+	switch typ {
+	case gqlQuery:
+		bs, err = c.gql.QueryRaw(ctx, &v, variables)
+	case gqlMutation:
+		bs, err = c.gql.MutateRaw(ctx, &v, variables)
+	default:
+		panic("unsupported graphql type")
+	}
+
+	// measure response size and times.
+	responseSize.WithLabelValues(labels...).Observe(float64(len(bs)))
+	responseTime.WithLabelValues(append(labels, "200")...).Observe(time.Since(now).Seconds())
+
+	if err != nil {
+		var errs graphql.Errors
+		if errors.As(err, &errs) {
+			for _, e := range errs {
+				if e.Message == "Throttled" {
+					SleepContext(ctx, backoff)
+					if backoff < 8*time.Second {
+						backoff *= 2
+					}
+					if attempt < c.config.retries {
+						goto retry
+					}
+				}
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 type client struct {
@@ -88,20 +176,12 @@ type client struct {
 	limiter *rate.Limiter
 }
 
-func (c *client) Endpoint(endpoint string) string {
-	protocol := "https"
-	if c.config.insecure {
-		protocol = "http"
-	}
-	return fmt.Sprintf("%s://%s/%s", protocol, c.sess.Shop, path.Join("admin/api", c.config.v.String(), endpoint))
-}
-
 func (c *client) Do(req *http.Request) (*http.Response, error) {
 	req.SetBasicAuth(c.config.clientID, c.sess.AccessToken)
 	if req.Body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
-	labels := []string{req.Host, req.URL.Path}
+	labels := []string{c.sess.Shop, req.URL.Path}
 	backoff := time.Second
 	attempt := 0
 retry:
@@ -142,7 +222,7 @@ retry:
 }
 
 func (c *client) Get(ctx context.Context, endpoint string, out any) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Endpoint(endpoint), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.config.Endpoint(c.sess.Shop, endpoint), nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -168,7 +248,7 @@ func (c *client) Create(ctx context.Context, endpoint string, in any, out any) (
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Endpoint(endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.Endpoint(c.sess.Shop, endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -195,7 +275,7 @@ func (c *client) Update(ctx context.Context, endpoint string, in any, out any) (
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Endpoint(endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.config.Endpoint(c.sess.Shop, endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}

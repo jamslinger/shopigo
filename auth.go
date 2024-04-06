@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/hasura/go-graphql-client"
 	log "log/slog"
 	"math/rand"
 	"net/http"
@@ -247,17 +246,13 @@ func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
 		logger.Debug("session invalid: expired")
 		return false
 	}
-	cl := a.Client(sess, nil)
-	client := graphql.NewClient(cl.Endpoint("graphql.json"), cl).
-		WithRequestModifier(func(r *http.Request) {
-			r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
-		})
+	cl := a.GraphQLClient(sess, nil)
 	var query struct {
 		Shop struct {
 			Name string `json:"name"`
 		} `graphql:"shop"`
 	}
-	err := client.Query(c.Request.Context(), &query, nil)
+	err := cl.Query(c.Request.Context(), "shop", &query, nil)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
 		return false
