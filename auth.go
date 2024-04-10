@@ -163,21 +163,21 @@ func (a *App) Install(c *gin.Context) {
 	state := c.Query("state")
 	defer DeleteCookies(c, AppStateCookie, AppStateCookieSig)
 	if ok, err := CompareSignedCookie(c, a.Credentials.ClientSecret, AppStateCookie, state); !ok {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("app state cookie mismatch"))
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("installation failed: app state cookie mismatch"))
 		return
 	} else if err != nil {
-		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("app state cookie mismatch: %w", err))
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("installation failed: app state cookie mismatch: %w", err))
 		return
 	}
 
 	if !a.ValidHmac(c) {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("hmac validation failed"))
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("installation failed: hmac validation failed"))
 		return
 	}
 
 	token, err := a.AccessToken(shop, c.Query("code"))
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to retrieve access token: %w", err))
+		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("installation failed: failed to retrieve access token: %w", err))
 		return
 	}
 
@@ -187,7 +187,7 @@ func (a *App) Install(c *gin.Context) {
 	if a.installHook != nil {
 		logger.Debug("calling install hook")
 		if err = a.installHook(c.Request.Context(), a, sess); err != nil {
-			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("install hook failed: %w", err))
+			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("installation failed: %w", err))
 			return
 		}
 	} else {
@@ -200,7 +200,7 @@ func (a *App) Install(c *gin.Context) {
 			}
 			logger.With("webhook", wh).Debug("registering uninstall webhook")
 			if id, err = a.Client(sess, nil).RegisterWebhook(c.Request.Context(), &wh); err != nil {
-				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("registering uninstall webhook failed: %w", err))
+				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("installation failed: registering uninstall webhook failed: %w", err))
 				return
 			}
 		}
@@ -209,7 +209,7 @@ func (a *App) Install(c *gin.Context) {
 			if id != 0 {
 				err = errors.Join(err, a.Client(sess, nil).DeleteWebhook(c.Request.Context(), id))
 			}
-			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to store session: %w", err))
+			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("installation failed: failed to store session: %w", err))
 			return
 		}
 	}
