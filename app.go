@@ -51,7 +51,6 @@ func validate(c *AppConfig) error {
 }
 
 func applyDefaults(a *App) {
-	a.v = VLatest
 	a.Logger = log.Default()
 	a.authBeginEndpoint = "/auth/begin"
 	a.authCallbackPath = "/auth/install"
@@ -62,16 +61,6 @@ func applyDefaults(a *App) {
 }
 
 type Opt = func(a *App)
-
-func WithVersion(v Version) Opt {
-	return func(a *App) {
-		if v != "" {
-			a.v = v
-		} else {
-			a.v = VLatest
-		}
-	}
-}
 
 // WithLogger sets the app's logger. If nil, log.Default() will be used.
 func WithLogger(logger *log.Logger) Opt {

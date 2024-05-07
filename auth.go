@@ -199,7 +199,7 @@ func (a *App) Install(c *gin.Context) {
 				Fields:  []string{"domain"},
 			}
 			logger.With("webhook", wh).Debug("registering uninstall webhook")
-			if id, err = a.Client(sess, nil).RegisterWebhook(c.Request.Context(), &wh); err != nil {
+			if id, err = a.Client(VLatest, sess, nil).RegisterWebhook(c.Request.Context(), &wh); err != nil {
 				_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("installation failed: registering uninstall webhook failed: %w", err))
 				return
 			}
@@ -207,7 +207,7 @@ func (a *App) Install(c *gin.Context) {
 		err = a.SessionStore.Store(c.Request.Context(), sess)
 		if err != nil {
 			if id != 0 {
-				err = errors.Join(err, a.Client(sess, nil).DeleteWebhook(c.Request.Context(), id))
+				err = errors.Join(err, a.Client(VLatest, sess, nil).DeleteWebhook(c.Request.Context(), id))
 			}
 			_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("installation failed: failed to store session: %w", err))
 			return
@@ -246,7 +246,7 @@ func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
 		logger.Debug("session invalid: expired")
 		return false
 	}
-	cl := a.GraphQLClient(sess, nil)
+	cl := a.GraphQLClient(VLatest, sess, nil)
 	var query struct {
 		Shop struct {
 			Name string `json:"name"`
