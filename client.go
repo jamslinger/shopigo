@@ -34,7 +34,6 @@ const (
 )
 
 type ClientConfig struct {
-	v           Version
 	clientID    string
 	hostURL     string
 	insecure    bool
@@ -42,12 +41,12 @@ type ClientConfig struct {
 	defaultShop *Shop
 }
 
-func (c *ClientConfig) Endpoint(shop string, endpoint string) string {
+func (c *ClientConfig) Endpoint(shop string, version Version, endpoint string) string {
 	protocol := "https"
 	if c.insecure {
 		protocol = "http"
 	}
-	return fmt.Sprintf("%s://%s/%s", protocol, shop, path.Join("admin/api", c.v.String(), endpoint))
+	return fmt.Sprintf("%s://%s/%s", protocol, shop, path.Join("admin/api", string(version), endpoint))
 }
 
 type ClientProvider struct {
@@ -79,20 +78,26 @@ type GraphQLClient interface {
 	Query(ctx context.Context, name string, v any, variables map[string]any) error
 }
 
-func (p *ClientProvider) Client(sess *Session, limiter *rate.Limiter) Client {
+func (p *ClientProvider) Client(v Version, sess *Session, limiter *rate.Limiter) Client {
 	if sess == nil {
 		panic("must provide client session")
 	}
-	return &client{config: p.ClientConfig, http: p.http, sess: sess, limiter: limiter}
+	if v == "" {
+		v = VLatest
+	}
+	return &client{version: v, config: p.ClientConfig, http: p.http, sess: sess, limiter: limiter}
 }
 
-func (p *ClientProvider) GraphQLClient(sess *Session, limiter *rate.Limiter) GraphQLClient {
+func (p *ClientProvider) GraphQLClient(v Version, sess *Session, limiter *rate.Limiter) GraphQLClient {
 	if sess == nil {
 		panic("must provide client session")
+	}
+	if v == "" {
+		v = VLatest
 	}
 	return &graphQLClient{
 		config: p.ClientConfig,
-		gql: graphql.NewClient(p.ClientConfig.Endpoint(sess.Shop, "graphql.json"), p.http).
+		gql: graphql.NewClient(p.ClientConfig.Endpoint(sess.Shop, v, "graphql.json"), p.http).
 			WithRequestModifier(func(r *http.Request) {
 				r.Header.Add("X-Shopify-Access-Token", sess.AccessToken)
 			}),
@@ -169,6 +174,7 @@ retry:
 }
 
 type client struct {
+	version Version
 	config  *ClientConfig
 	http    *http.Client
 	sess    *Session
@@ -221,7 +227,7 @@ retry:
 }
 
 func (c *client) Get(ctx context.Context, endpoint string, out any) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.config.Endpoint(c.sess.Shop, endpoint), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.config.Endpoint(c.sess.Shop, c.version, endpoint), nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -247,7 +253,7 @@ func (c *client) Create(ctx context.Context, endpoint string, in any, out any) (
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.Endpoint(c.sess.Shop, endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.Endpoint(c.sess.Shop, c.version, endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -274,7 +280,7 @@ func (c *client) Update(ctx context.Context, endpoint string, in any, out any) (
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
 		return 0, fmt.Errorf("failed to encode request object: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.config.Endpoint(c.sess.Shop, endpoint), &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.config.Endpoint(c.sess.Shop, c.version, endpoint), &body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
