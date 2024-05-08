@@ -25,19 +25,19 @@ func (v Version) String() string {
 }
 
 func (v Version) Values() (vals []string) {
-	for _, val := range []Version{V202404, V202401, V202310, V202307} {
+	for _, val := range []Version{V202407, V202404, V202401, V202310} {
 		vals = append(vals, string(val))
 	}
 	return
 }
 
 const (
-	VLatest Version = V202404
+	VLatest Version = V202407
 
+	V202407 Version = "2024-07"
 	V202404 Version = "2024-04"
 	V202401 Version = "2024-01"
 	V202310 Version = "2023-10"
-	V202307 Version = "2023-07"
 )
 
 type ClientConfig struct {
