@@ -15,6 +15,7 @@ type Session struct {
 	AccessToken string     `json:"access_token"`
 	Scopes      string     `json:"scopes"`
 	Expires     *time.Time `json:"expires"`
+	Custom      any        `json:"custom"`
 }
 
 type SessionStore interface {
