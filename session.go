@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"strings"
 	"time"
 )
 
@@ -57,6 +58,10 @@ func (i inMemSessionStore) Delete(_ context.Context, id string) error {
 
 func GetOfflineSessionID(shop string) string {
 	return fmt.Sprintf("offline_%s", shop)
+}
+
+func GetShopFromOfflineSessionID(id string) string {
+	return strings.TrimPrefix(id, "offline_")
 }
 
 func MustGetShopSession(c *gin.Context) *Session {
