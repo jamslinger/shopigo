@@ -31,6 +31,10 @@ func (v Version) Values() (vals []string) {
 	return
 }
 
+func (v Version) Latest() Version {
+	return V202407
+}
+
 const (
 	VLatest Version = "Latest"
 	V202407 Version = "2024-07"
@@ -51,6 +55,9 @@ func (c *ClientConfig) Endpoint(shop string, version Version, endpoint string) s
 	protocol := "https"
 	if c.insecure {
 		protocol = "http"
+	}
+	if version == VLatest || version == "" {
+		version = version.Latest()
 	}
 	return fmt.Sprintf("%s://%s/%s", protocol, shop, path.Join("admin/api", string(version), endpoint))
 }
@@ -88,18 +95,12 @@ func (p *ClientProvider) Client(v Version, sess *Session, limiter *rate.Limiter)
 	if sess == nil {
 		panic("must provide client session")
 	}
-	if v == "" {
-		v = VLatest
-	}
 	return &client{version: v, config: p.ClientConfig, http: p.http, sess: sess, limiter: limiter}
 }
 
 func (p *ClientProvider) GraphQLClient(v Version, sess *Session, limiter *rate.Limiter) GraphQLClient {
 	if sess == nil {
 		panic("must provide client session")
-	}
-	if v == "" {
-		v = VLatest
 	}
 	return &graphQLClient{
 		config: p.ClientConfig,
