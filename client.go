@@ -73,9 +73,9 @@ func NewShopifyClientProvider(c ClientConfig) *ClientProvider {
 
 type Client interface {
 	Do(req *http.Request) (*http.Response, error)
-	Get(ctx context.Context, endpoint string, out any) (int, error)
-	Create(ctx context.Context, endpoint string, in any, out any) (int, error)
-	Update(ctx context.Context, endpoint string, in any, out any) (int, error)
+	Get(ctx context.Context, endpoint string, out any) (*http.Response, error)
+	Create(ctx context.Context, endpoint string, in any, out any) (*http.Response, error)
+	Update(ctx context.Context, endpoint string, in any, out any) (*http.Response, error)
 
 	WebhookClient
 }
@@ -233,80 +233,80 @@ retry:
 	return resp, nil
 }
 
-func (c *client) Get(ctx context.Context, endpoint string, out any) (int, error) {
+func (c *client) Get(ctx context.Context, endpoint string, out any) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.config.Endpoint(c.sess.Shop, c.version, endpoint), nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+		return resp, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
 	}
 	if out != nil {
 		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return resp.StatusCode, fmt.Errorf("failed to decode response: %w", err)
+			return resp, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}
-	return resp.StatusCode, nil
+	return resp, nil
 }
 
-func (c *client) Create(ctx context.Context, endpoint string, in any, out any) (int, error) {
+func (c *client) Create(ctx context.Context, endpoint string, in any, out any) (*http.Response, error) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
-		return 0, fmt.Errorf("failed to encode request object: %w", err)
+		return nil, fmt.Errorf("failed to encode request object: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.Endpoint(c.sess.Shop, c.version, endpoint), &body)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+		return resp, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
 	}
 	if out != nil {
 		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return resp.StatusCode, fmt.Errorf("failed to decode response: %w", err)
+			return resp, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}
-	return resp.StatusCode, nil
+	return resp, nil
 }
 
-func (c *client) Update(ctx context.Context, endpoint string, in any, out any) (int, error) {
+func (c *client) Update(ctx context.Context, endpoint string, in any, out any) (*http.Response, error) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(in); err != nil {
-		return 0, fmt.Errorf("failed to encode request object: %w", err)
+		return nil, fmt.Errorf("failed to encode request object: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.config.Endpoint(c.sess.Shop, c.version, endpoint), &body)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		bs, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
+		return resp, fmt.Errorf("request failed, status: %d, detail: %s", resp.StatusCode, string(bs))
 	}
 	if out != nil {
 		if err = json.NewDecoder(resp.Body).Decode(out); err != nil {
-			return resp.StatusCode, fmt.Errorf("failed to decode response: %w", err)
+			return resp, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}
-	return resp.StatusCode, nil
+	return resp, nil
 }
 
 type PageInfo struct {
