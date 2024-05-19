@@ -73,7 +73,7 @@ func (c *client) RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err 
 		return 0, err
 	}
 	for i := range whs {
-		if whs[i].Topic == wh.Topic {
+		if whs[i].Address == wh.Address && whs[i].Topic == wh.Topic {
 			id = whs[i].ID
 		}
 	}
