@@ -68,6 +68,10 @@ func (c *client) GetWebhooks(ctx context.Context) ([]*Webhook, error) {
 }
 
 func (c *client) RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err error) {
+	wh.Address, err = url.JoinPath(c.config.hostURL, wh.Address)
+	if err != nil {
+		return 0, err
+	}
 	whs, err := c.GetWebhooks(ctx)
 	if err != nil {
 		return 0, err
@@ -76,10 +80,6 @@ func (c *client) RegisterWebhook(ctx context.Context, wh *Webhook) (id int, err 
 		if whs[i].Address == wh.Address && whs[i].Topic == wh.Topic {
 			id = whs[i].ID
 		}
-	}
-	wh.Address, err = url.JoinPath(c.config.hostURL, wh.Address)
-	if err != nil {
-		return 0, err
 	}
 	body, err := json.Marshal(WebhookRequest{Webhook: wh})
 	if err != nil {
