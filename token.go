@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -31,10 +30,6 @@ func (a *App) AccessToken(shop string, code string) (*AccessToken, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		bs, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("status: %d, cause: %s", resp.StatusCode, string(bs))
-	}
 	var token AccessToken
 	if err = json.NewDecoder(resp.Body).Decode(&token); err != nil {
 		return nil, err
