@@ -89,6 +89,7 @@ type WebhookClient interface {
 type GraphQLClient interface {
 	Mutate(ctx context.Context, name string, v any, variables map[string]any) error
 	Query(ctx context.Context, name string, v any, variables map[string]any) error
+	Exec(ctx context.Context, name string, q string, v any, variables map[string]any) error
 }
 
 func (p *ClientProvider) Client(v Version, sess *Session, limiter *rate.Limiter) Client {
@@ -124,17 +125,22 @@ type gqlType int
 const (
 	gqlQuery gqlType = iota
 	gqlMutation
+	gqlExec
 )
 
 func (c *graphQLClient) Query(ctx context.Context, name string, v any, variables map[string]any) error {
-	return c.do(ctx, gqlQuery, name, v, variables)
+	return c.do(ctx, gqlQuery, name, "", v, variables)
 }
 
 func (c *graphQLClient) Mutate(ctx context.Context, name string, v any, variables map[string]any) error {
-	return c.do(ctx, gqlMutation, name, v, variables)
+	return c.do(ctx, gqlMutation, name, "", v, variables)
 }
 
-func (c *graphQLClient) do(ctx context.Context, typ gqlType, name string, v any, variables map[string]any) error {
+func (c *graphQLClient) Exec(ctx context.Context, name string, q string, v any, variables map[string]any) error {
+	return c.do(ctx, gqlExec, name, q, v, variables)
+}
+
+func (c *graphQLClient) do(ctx context.Context, typ gqlType, name string, q string, v any, variables map[string]any) error {
 	labels := []string{c.sess.Shop, "graphql/" + name}
 	backoff := time.Second
 	attempt := 0
@@ -153,6 +159,8 @@ retry:
 		err = c.gql.Query(ctx, v, variables)
 	case gqlMutation:
 		err = c.gql.Mutate(ctx, v, variables)
+	case gqlExec:
+		err = c.gql.Exec(ctx, q, v, variables)
 	default:
 		panic("unsupported graphql type")
 	}
