@@ -108,6 +108,14 @@ func GetShop(c *gin.Context) (string, error) {
 	return s.Shop, nil
 }
 
+func GetShopID(c *gin.Context) (string, error) {
+	shop, err := GetShop(c)
+	if err != nil {
+		panic(err)
+	}
+	return GetOfflineSessionID(shop), nil
+}
+
 func MustGetShop(c *gin.Context) string {
 	shop, err := GetShop(c)
 	if err != nil {
