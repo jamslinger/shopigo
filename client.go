@@ -44,11 +44,10 @@ const (
 )
 
 type ClientConfig struct {
-	clientID    string
-	hostURL     string
-	insecure    bool
-	retries     int
-	defaultShop *Shop
+	clientID string
+	hostURL  string
+	insecure bool
+	retries  int
 }
 
 func (c *ClientConfig) Endpoint(shop string, version Version, endpoint string) string {

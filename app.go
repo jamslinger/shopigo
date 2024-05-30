@@ -13,7 +13,6 @@ import (
 var (
 	defaultTLDs  = []string{"myshopify.com", "shopify.com", "myshopify.io"}
 	subDomainReg = "[a-zA-Z0-9][a-zA-Z0-9-_]*"
-	TraceIDKey   = "KeyTraceID"
 )
 
 type App struct {
@@ -74,12 +73,6 @@ func WithLogger(logger *log.Logger) Opt {
 func WithRetry(n int) Opt {
 	return func(a *App) {
 		a.retries = n
-	}
-}
-
-func WithDefaultAuth(s *Shop) Opt {
-	return func(a *App) {
-		a.defaultShop = s
 	}
 }
 
