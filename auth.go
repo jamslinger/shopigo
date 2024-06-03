@@ -68,13 +68,12 @@ func (a *App) EnsureInstalledOnShop(c *gin.Context) {
 
 func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 	logger := a.Logger
-	logger.Debug("retrieve session ID")
 	sessID, shop, err := a.getSessionID(c)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusUnauthorized, err)
+		_ = c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("failed to retrieve session ID: %w", err))
 		return
 	}
-	logger.Debug("retrieve session")
+
 	sess, err := a.SessionStore.Get(c.Request.Context(), sessID)
 	if IsNotFound(err) {
 		if shop != "" {
@@ -94,7 +93,7 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	} else if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to retrieve session: %w", err))
 		return
 	}
 	if shop, err = a.sanitizeShop(c.Query("shop")); err == nil && shop != sess.Shop {
