@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	log "log/slog"
 	"math/rand"
 	"net/http"
@@ -19,125 +18,124 @@ import (
 
 var (
 	exitFrameRegexp = regexp.MustCompile("^(?i)/exitiframe")
+
+	errSessionNotFound = errors.New("session not found")
 )
 
 const (
-	metadataKey       = "metadataKey"
-	ShopSessionKey    = "ShopifyShopSessionKey"
-	AppStateCookie    = "shopify_app_state"
-	AppStateCookieSig = "shopify_app_state.sig"
+	appStateCookie    = "shopify_app_state"
+	appStateCookieSig = "shopify_app_state.sig"
 )
 
-func (a *App) EnsureInstalledOnShop(c *gin.Context) {
-	shop, err := a.sanitizeShop(c.Query("shop"))
+func (a *App) EnsureInstalledOnShop(w http.ResponseWriter, r *http.Request) {
+	shop, err := a.sanitizeShop(r.URL.Query().Get("shop"))
 	if err != nil {
-		log.Warn("failed to sanitize shop", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusBadRequest)
+		AbortWithError(r, err)
 		return
 	}
-	setShop(c, shop)
+	setShop(r, shop)
+
 	logger := a.Logger.With(log.String("shop", shop))
+	setLogger(r, logger)
+
 	logger.Debug("check if app is installed")
-	sess, err := a.SessionStore.Get(c.Request.Context(), GetOfflineSessionID(shop))
+
+	sess, err := a.SessionStore.Get(r.Context(), GetOfflineSessionID(shop))
 	if IsNotFound(err) {
 		logger.Debug("no session found")
-		if !exitFrameRegexp.MatchString(c.Request.RequestURI) {
-			logger.Debug("not in exitframe")
-			a.redirectToAuth(logger, c)
+		if !exitFrameRegexp.MatchString(r.RequestURI) {
+			logger.Debug("not in /exitframe, redirecting to auth")
+			a.redirectToAuth(w, r)
 			return
 		}
-		logger.Debug("we are in an /exitframe request, serve app")
+		logger.Debug("in /exitframe, serve frame")
 	} else if err != nil {
-		logger.Error("failed to retrieve session", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusInternalServerError)
+		AbortWithError(r, fmt.Errorf("failed to retrieve session: %w", err))
 		return
 	}
-	if !isEmbedded(c) {
+	if !isEmbedded(r) {
 		logger.Debug("tried to use embedded app in non-embedded context, validate session")
-		if !a.sessionValid(c, sess) {
+		if !a.sessionValid(r, sess) {
 			logger.Debug("session is invalid, redirecting to auth")
-			a.redirectToAuth(logger, c)
+			a.redirectToAuth(w, r)
 			return
 		}
 		logger.Debug("session validated, attempt embed")
-		a.embedAppIntoShopify(logger, c)
+		a.embedAppIntoShopify(w, r)
 		return
 	}
 	logger.Debug("app is installed and ready to load")
 }
 
-func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
-	logger := a.Logger
-	sessID, shop, err := a.getSessionID(c)
+func (a *App) ValidateAuthenticatedSession(w http.ResponseWriter, r *http.Request) {
+	sessID, shop, err := a.getSessionID(r)
 	if err != nil {
-		logger.Warn("failed to retrieve session ID", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusUnauthorized)
+		AbortWithError(r, fmt.Errorf("failed to retrieve session ID: %w", err))
 		return
 	}
-	logger = logger.With("shop", shop)
+	setShop(r, shop)
 
-	sess, err := a.SessionStore.Get(c.Request.Context(), sessID)
+	logger := a.Logger.With(log.String("shop", shop))
+	setLogger(r, logger)
+
+	sess, err := a.SessionStore.Get(r.Context(), sessID)
 	if IsNotFound(err) {
 		if shop != "" {
 			logger.Debug("session not found but shop in bearer token, redirecting to auth")
-			setShop(c, shop)
 			redirect, err := url.JoinPath(a.HostURL,
 				fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {shop}}.Encode()))
 			if err != nil {
-				logger.Warn("failed to construct redirect uri", "error", err)
-				c.AbortWithStatus(http.StatusForbidden)
+				w.WriteHeader(http.StatusInternalServerError)
+				AbortWithError(r, fmt.Errorf("failed to construct redirect uri: %w", err))
 				return
 			}
-			setRedirectURI(c, redirect)
-			a.redirectOutOfApp(c)
+			a.redirectOutOfApp(w, r, redirect)
 			return
 		}
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusUnauthorized)
+		AbortWithError(r, errSessionNotFound)
 		return
 	} else if err != nil {
-		logger.Warn("failed to retrieve session", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusInternalServerError)
+		AbortWithError(r, fmt.Errorf("failed to retrieve session: %w", err))
 		return
 	}
-	if shop, err = a.sanitizeShop(c.Query("shop")); err == nil && shop != sess.Shop {
-		logger.With(log.String("shop", sess.Shop), log.String("request-shop", shop)).
-			Debug("session found but for different shop as in request, redirecting to auth")
-		setShop(c, shop)
-		a.redirectToAuth(logger, c)
+	if shop, err = a.sanitizeShop(r.URL.Query().Get("shop")); err == nil && shop != sess.Shop {
+		logger.With(log.String("request-shop", shop)).Debug("session found but for different shop as in request, redirecting to auth")
+		a.redirectToAuth(w, r)
 		return
 	}
-	if !a.sessionValid(c, sess) {
-		logger.With(log.String("shop", sess.Shop)).
-			Debug("session is invalid, redirecting to auth")
-		setShop(c, sess.Shop)
+	if !a.sessionValid(r, sess) {
+		logger.Debug("session is invalid, redirecting to auth")
 		redirect, err := url.JoinPath(a.HostURL,
 			fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {sess.Shop}}.Encode()))
 		if err != nil {
-			logger.Warn("failed to construct redirect uri", "error", err)
-			c.AbortWithStatus(http.StatusForbidden)
+			w.WriteHeader(http.StatusInternalServerError)
+			AbortWithError(r, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
 		}
-		setRedirectURI(c, redirect)
-		a.redirectOutOfApp(c)
+		a.redirectOutOfApp(w, r, redirect)
 		return
 	}
-	c.Set(ShopSessionKey, sess)
+	setSession(r, sess)
 }
 
-func (a *App) Begin(c *gin.Context) {
-	logger := a.Logger
-
-	shop := getShop(c)
-	if shop == "" {
-		var err error
-		if shop, err = a.sanitizeShop(c.Query("shop")); err != nil {
-			logger.Warn("failed to sanitize shop", "error", err)
-			c.AbortWithStatus(http.StatusForbidden)
-			return
-		}
+func (a *App) Begin(w http.ResponseWriter, r *http.Request) {
+	shop, err := a.sanitizeShop(r.URL.Query().Get("shop"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		AbortWithError(r, fmt.Errorf("failed to sanitize shop: %w", err))
+		return
 	}
+	setShop(r, shop)
 
-	logger = logger.With(log.String("shop", shop))
+	logger := a.Logger.With(log.String("shop", shop))
+	setLogger(r, logger)
+
+	logger.Debug("beginning app install")
 
 	nonce := strconv.FormatInt(rand.Int63(), 10)
 	query := url.Values{
@@ -147,47 +145,50 @@ func (a *App) Begin(c *gin.Context) {
 		"state":        {nonce},
 	}
 	expires := time.Now().Add(time.Hour)
-	SetSignedCookie(c, a.Credentials.ClientSecret, AppStateCookie, nonce, a.authCallbackPath, &expires)
+	setSignedCookie(w, a.Credentials.ClientSecret, appStateCookie, nonce, a.authCallbackPath, &expires)
 
 	redirect := fmt.Sprintf("https://%s/admin/oauth/authorize?%s", shop, query.Encode())
 	logger.With(log.String("redirect", redirect)).Debug("beginning auth")
-	c.Redirect(http.StatusFound, redirect)
-	c.Abort()
+	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
-func (a *App) Install(c *gin.Context) {
-	logger := a.Logger.With(log.String("shop", c.Query("shop")))
-	logger.Debug("beginning install")
-
-	shop, err := a.sanitizeShop(c.Query("shop"))
+func (a *App) Install(w http.ResponseWriter, r *http.Request) {
+	shop, err := a.sanitizeShop(r.URL.Query().Get("shop"))
 	if err != nil {
-		logger.Warn("failed to sanitize shop", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusBadRequest)
+		AbortWithError(r, fmt.Errorf("failed to sanitize shop: %w", err))
 		return
 	}
+	setShop(r, shop)
 
-	state := c.Query("state")
-	defer DeleteCookies(c, AppStateCookie, AppStateCookieSig)
-	if ok, err := CompareSignedCookie(c, a.Credentials.ClientSecret, AppStateCookie, state); err != nil {
-		logger.Warn("app state cookie mismatch", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+	logger := a.Logger.With(log.String("shop", shop))
+	setLogger(r, logger)
+
+	logger.Debug("installing app")
+
+	state := r.URL.Query().Get("state")
+	defer deleteCookies(w, appStateCookie, appStateCookieSig)
+	if ok, err := compareSignedCookie(r, a.Credentials.ClientSecret, appStateCookie, state); err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		AbortWithError(r, fmt.Errorf("app state cookie mismatch: %w", err))
 		return
 	} else if !ok {
-		logger.Warn("app state cookie mismatch")
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusForbidden)
+		AbortWithError(r, fmt.Errorf("app state cookie mismatch: %w", err))
 		return
 	}
 
-	if !a.ValidHmac(c) {
-		logger.Warn("hmac validation failed")
-		c.AbortWithStatus(http.StatusForbidden)
+	if !a.ValidHmac(r) {
+		w.WriteHeader(http.StatusForbidden)
+		AbortWithError(r, errors.New("hmac validation failed"))
 		return
 	}
 
-	token, err := a.AccessToken(shop, c.Query("code"))
+	code := r.URL.Query().Get("code")
+	token, err := a.AccessToken(shop, code)
 	if err != nil {
-		logger.Warn("failed to retrieve access token", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusInternalServerError)
+		AbortWithError(r, fmt.Errorf("failed to retrieve access token: %w", err))
 		return
 	}
 
@@ -196,9 +197,9 @@ func (a *App) Install(c *gin.Context) {
 
 	if a.installHook != nil {
 		logger.Debug("calling install hook")
-		if err = a.installHook(c.Request.Context(), a, sess); err != nil {
-			logger.Warn("install hook failed", "error", err)
-			c.AbortWithStatus(http.StatusForbidden)
+		if err = a.installHook(r.Context(), a, sess); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			AbortWithError(r, fmt.Errorf("install hook failed: %w", err))
 			return
 		}
 	} else {
@@ -210,53 +211,51 @@ func (a *App) Install(c *gin.Context) {
 				Fields:  []string{"domain"},
 			}
 			logger.With("webhook", wh).Debug("registering uninstall webhook")
-			if id, err = a.Client(VLatest, sess, nil).RegisterWebhook(c.Request.Context(), &wh); err != nil {
-				logger.Warn("failed to register uninstall webhook", "error", err)
-				c.AbortWithStatus(http.StatusForbidden)
+			if id, err = a.Client(VLatest, sess, nil).RegisterWebhook(r.Context(), &wh); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				AbortWithError(r, fmt.Errorf("failed to register uninstall webhook: %w", err))
 				return
 			}
 		}
-		err = a.SessionStore.Store(c.Request.Context(), sess)
+		err = a.SessionStore.Store(r.Context(), sess)
 		if err != nil {
 			if id != 0 {
-				err = errors.Join(err, a.Client(VLatest, sess, nil).DeleteWebhook(c.Request.Context(), id))
+				err = errors.Join(err, a.Client(VLatest, sess, nil).DeleteWebhook(r.Context(), id))
 			}
-			logger.Warn("failed to store session", "error", err)
-			c.AbortWithStatus(http.StatusForbidden)
+			w.WriteHeader(http.StatusInternalServerError)
+			AbortWithError(r, fmt.Errorf("failed to store session: %w", err))
 			return
 		}
 	}
-
-	c.Set(ShopSessionKey, sess)
-	redirect := "/?" + c.Request.URL.Query().Encode()
+	setSession(r, sess)
+	redirect := "/?" + r.URL.Query().Encode()
 	logger.With(log.String("redirect", redirect)).Debug("app installed, redirecting to app")
-	c.Redirect(http.StatusFound, redirect)
+	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
-func (a *App) getSessionID(c *gin.Context) (string, string, error) {
-	token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+func (a *App) getSessionID(r *http.Request) (string, string, error) {
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if token == "" {
 		return "", "", errors.New("missing 'Authorization' header")
 	}
 	return a.parseJWTSessionID(token)
 }
 
-func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
-	logger := a.Logger
+func (a *App) sessionValid(r *http.Request, sess *Session) bool {
 	if sess == nil {
 		a.Debug("session invalid: nil")
 		return false
 	}
 	if sess.AccessToken == "" {
-		logger.Debug("session invalid: empty access token")
+		GetLogger(r).Debug("session invalid: empty access token")
 		return false
 	}
 	if sess.Scopes != a.scopes {
-		logger.Debug("session invalid: scopes changed")
+		GetLogger(r).Debug("session invalid: scopes changed")
 		return false
 	}
 	if sess.Expires != nil && time.Now().After(*sess.Expires) {
-		logger.Debug("session invalid: expired")
+		GetLogger(r).Debug("session invalid: expired")
 		return false
 	}
 	cl := a.GraphQLClient(VLatest, sess, nil)
@@ -265,9 +264,9 @@ func (a *App) sessionValid(c *gin.Context, sess *Session) bool {
 			Name string `json:"name"`
 		} `graphql:"shop"`
 	}
-	err := cl.Query(c.Request.Context(), "shop", &query, nil)
+	err := cl.Query(r.Context(), "shop", &query, nil)
 	if err != nil {
-		logger.Debug(fmt.Sprintf("session invalid: %s", err.Error()))
+		GetLogger(r).Debug("session invalid", "error", err)
 		return false
 	}
 	return true
@@ -284,12 +283,12 @@ func (a *App) createSession(shop string, state string, token *AccessToken) *Sess
 	}
 }
 
-func (a *App) ValidHmac(c *gin.Context) bool {
-	h, err := hex.DecodeString(c.Query("hmac"))
+func (a *App) ValidHmac(r *http.Request) bool {
+	h, err := hex.DecodeString(r.URL.Query().Get("hmac"))
 	if err != nil {
 		return false
 	}
-	q := c.Request.URL.Query()
+	q := r.URL.Query()
 	q.Del("hmac")
 	message, _ := url.QueryUnescape(q.Encode())
 	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
@@ -298,87 +297,82 @@ func (a *App) ValidHmac(c *gin.Context) bool {
 	return hmac.Equal(h, validMac)
 }
 
-func (a *App) VerifyShopifyOrigin(logger *log.Logger, c *gin.Context) {
-	if !exitFrameRegexp.MatchString(c.Request.RequestURI) && !a.ValidHmac(c) {
-		logger.Error("failed hmac validation")
-		c.AbortWithStatus(http.StatusForbidden)
+func (a *App) VerifyShopifyOrigin(w http.ResponseWriter, r *http.Request) {
+	if !exitFrameRegexp.MatchString(r.RequestURI) && !a.ValidHmac(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		AbortWithError(r, errors.New("hmac validation failed"))
 		return
 	}
 }
 
-func (a *App) ContentSecurity(c *gin.Context) {
-	shop := c.Query("shop")
-	c.Header("Content-Security-Policy", fmt.Sprintf("frame-ancestors https://%s https://admin.shopify.com", shop))
+func (a *App) ContentSecurity(w http.ResponseWriter, r *http.Request) {
+	shop := r.URL.Query().Get("shop")
+	w.Header().Add("Content-Security-Policy", fmt.Sprintf("frame-ancestors https://%s https://admin.shopify.com", shop))
 }
 
-func isEmbedded(c *gin.Context) bool {
-	return c.Query("embedded") == "1"
+func isEmbedded(r *http.Request) bool {
+	return r.URL.Query().Get("embedded") == "1"
 }
 
-func (a *App) redirectToAuth(logger *log.Logger, c *gin.Context) {
-	shop := mustGetShop(c)
-	if isEmbedded(c) {
-		host, err := a.sanitizeHost(c.Query("host"))
+func (a *App) redirectToAuth(w http.ResponseWriter, r *http.Request) {
+	if isEmbedded(r) {
+		host, err := a.sanitizeHost(r.URL.Query().Get("host"))
 		if err != nil {
-			logger.Error("failed to sanitize host", "error", err)
-			c.AbortWithStatus(http.StatusForbidden)
+			w.WriteHeader(http.StatusBadRequest)
+			AbortWithError(r, fmt.Errorf("failed to sanitize host: %w", err))
 			return
 		}
 		redirect, err := url.JoinPath(a.HostURL,
-			fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {shop}, "host": {host}}.Encode()))
+			fmt.Sprintf("%s?%s", a.authBeginEndpoint, url.Values{"shop": {MustGetShop(r)}, "host": {host}}.Encode()))
 		if err != nil {
-			logger.Error("failed to construct redirect uri", "error", err)
-			c.AbortWithStatus(http.StatusForbidden)
+			w.WriteHeader(http.StatusInternalServerError)
+			AbortWithError(r, fmt.Errorf("failed to construct redirect uri: %w", err))
 			return
 		}
-		setRedirectURI(c, redirect)
-		logger.With(log.String("redirect", redirect)).Debug("redirecting out of app")
-		a.redirectOutOfApp(c)
+		GetLogger(r).With(log.String("redirect", redirect)).Debug("redirecting out of app")
+		a.redirectOutOfApp(w, r, redirect)
 		return
 	}
-	logger.Debug("app is not embedded, begin auth")
-	a.Begin(c)
+	GetLogger(r).Debug("app is not embedded, begin auth")
+	a.Begin(w, r)
 }
 
-func (a *App) redirectOutOfApp(c *gin.Context) {
-	shop := mustGetShop(c)
-	logger := a.Logger.With(log.String("shop", shop))
-	if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok && token != "" {
-		logger.Debug("bearer token found, performing app bridge header redirect")
-		a.appBridgeHeaderRedirect(c)
-	} else if isEmbedded(c) {
-		logger.Debug("app is embedded, performing exitiframe redirect")
-		query := c.Request.URL.Query()
-		query.Add("redirectUri", mustGetRedirectURI(c))
-		c.Redirect(http.StatusFound, "/exitiframe?"+query.Encode())
+func (a *App) redirectOutOfApp(w http.ResponseWriter, r *http.Request, redirect string) {
+	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && token != "" {
+		GetLogger(r).Debug("bearer token found, performing app bridge header redirect")
+		a.appBridgeHeaderRedirect(w, redirect)
+	} else if isEmbedded(r) {
+		GetLogger(r).Debug("app is embedded, performing exitiframe redirect")
+		query := r.URL.Query()
+		query.Add("redirectUri", redirect)
+		http.Redirect(w, r, "/exitiframe?"+query.Encode(), http.StatusFound)
 	} else {
-		logger.Debug("app is not embedded, performing direct redirect")
-		c.Redirect(http.StatusFound, mustGetRedirectURI(c))
+		GetLogger(r).Debug("app is not embedded, performing direct redirect")
+		http.Redirect(w, r, redirect, http.StatusFound)
 	}
-	c.Abort()
+	Abort(r)
 }
 
-func (a *App) appBridgeHeaderRedirect(c *gin.Context) {
-	c.Writer.Header().Add("Access-Control-Expose-Headers", "X-Shopify-Api-Request-Failure-Reauthorize")
-	c.Writer.Header().Add("Access-Control-Expose-Headers", "X-Shopify-Api-Request-Failure-Reauthorize-Url")
-	c.Header("X-Shopify-API-Request-Failure-Reauthorize", "1")
-	c.Header("X-Shopify-API-Request-Failure-Reauthorize-Url", mustGetRedirectURI(c))
-	c.AbortWithStatus(http.StatusForbidden)
+func (a *App) appBridgeHeaderRedirect(w http.ResponseWriter, redirect string) {
+	w.Header().Add("Access-Control-Expose-Headers", "X-Shopify-Api-Request-Failure-Reauthorize")
+	w.Header().Add("Access-Control-Expose-Headers", "X-Shopify-Api-Request-Failure-Reauthorize-Url")
+	w.Header().Add("X-Shopify-API-Request-Failure-Reauthorize", "1")
+	w.Header().Add("X-Shopify-API-Request-Failure-Reauthorize-Url", redirect)
+	w.WriteHeader(http.StatusForbidden)
 }
 
-func (a *App) embedAppIntoShopify(logger *log.Logger, c *gin.Context) {
-	decodedHost, err := decodeHost(c.Query("host"))
+func (a *App) embedAppIntoShopify(w http.ResponseWriter, r *http.Request) {
+	decodedHost, err := decodeHost(r.URL.Query().Get("host"))
 	if err != nil {
-		logger.Error("failed to embed app", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusBadRequest)
+		AbortWithError(r, fmt.Errorf("failed to sanitize host: %w", err))
 		return
 	}
-	u, err := url.JoinPath("https://", decodedHost, "apps", a.AppConfig.Credentials.ClientID, c.Request.URL.Path)
+	u, err := url.JoinPath("https://", decodedHost, "apps", a.AppConfig.Credentials.ClientID, r.URL.Path)
 	if err != nil {
-		logger.Error("failed to embed app", "error", err)
-		c.AbortWithStatus(http.StatusForbidden)
+		w.WriteHeader(http.StatusInternalServerError)
+		AbortWithError(r, fmt.Errorf("failed to construct redirect URL: %w", err))
 		return
 	}
-	c.Redirect(http.StatusFound, u)
-	c.Abort()
+	http.Redirect(w, r, u, http.StatusFound)
 }

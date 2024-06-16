@@ -1,54 +1,111 @@
 package shopigo
 
-import "github.com/gin-gonic/gin"
+import (
+	"context"
+	"errors"
+	log "log/slog"
+	"net/http"
+)
 
-type authMetadata struct {
-	shop        string
-	redirectURI string
-}
+const (
+	ShopKey    = "shopigo/shop-key"
+	LoggerKey  = "shopigo/logger-key"
+	SessionKey = "shopigo/session-key"
+)
 
-func setShop(c *gin.Context, shop string) {
-	if _, ok := c.Get(metadataKey); !ok {
-		c.Set(metadataKey, authMetadata{})
+func Abort(r *http.Request) {
+	if r.Context().Err() == nil {
+		ctx, cancel := context.WithCancel(r.Context())
+		*r = *r.WithContext(ctx)
+		cancel()
 	}
-	d := mustGetMetaData(c)
-	d.shop = shop
-	c.Set(metadataKey, d)
 }
 
-func setRedirectURI(c *gin.Context, redirectURI string) {
-	if _, ok := c.Get(metadataKey); !ok {
-		c.Set(metadataKey, authMetadata{})
+func AbortWithError(r *http.Request, err error) {
+	if r.Context().Err() == nil {
+		ctx, cancel := context.WithCancelCause(r.Context())
+		*r = *r.WithContext(ctx)
+		cancel(err)
 	}
-	d := mustGetMetaData(c)
-	d.redirectURI = redirectURI
-	c.Set(metadataKey, d)
 }
 
-func mustGetMetaData(c *gin.Context) authMetadata {
-	d, ok := c.MustGet(metadataKey).(authMetadata)
-	if !ok {
-		panic("gin context must contain authMetadata")
+func setShop(r *http.Request, shop string) {
+	*r = *r.WithContext(context.WithValue(r.Context(), ShopKey, shop))
+}
+
+func setLogger(r *http.Request, logger *log.Logger) {
+	*r = *r.WithContext(context.WithValue(r.Context(), LoggerKey, logger))
+}
+
+func setSession(r *http.Request, sess *Session) {
+	*r = *r.WithContext(context.WithValue(r.Context(), SessionKey, sess))
+}
+
+func GetShop(r *http.Request) (string, error) {
+	shop, ok := r.Context().Value(ShopKey).(string)
+	if ok && shop != "" {
+		return shop, nil
 	}
-	return d
-}
-
-func getMetaData(c *gin.Context) (md authMetadata) {
-	d, ok := c.Get(metadataKey)
-	if !ok {
-		return
+	sess, ok := r.Context().Value(SessionKey).(*Session)
+	if ok && sess != nil {
+		return sess.Shop, nil
 	}
-	return d.(authMetadata)
+	if shop = r.Header.Get(XDomainHeader); shop != "" {
+		return shop, nil
+	}
+	return "", errors.New("context doesn't hold session")
 }
 
-func mustGetShop(c *gin.Context) string {
-	return mustGetMetaData(c).shop
+func MustGetShop(r *http.Request) string {
+	shop, err := GetShop(r)
+	if err != nil {
+		panic(err)
+	}
+	return shop
 }
 
-func getShop(c *gin.Context) string {
-	return getMetaData(c).shop
+func GetShopID(r *http.Request) (string, error) {
+	shop, err := GetShop(r)
+	if err != nil {
+		panic(err)
+	}
+	return GetOfflineSessionID(shop), nil
 }
 
-func mustGetRedirectURI(c *gin.Context) string {
-	return mustGetMetaData(c).redirectURI
+func MustGetShopID(r *http.Request) string {
+	id, err := GetShopID(r)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+func MustGetSession(r *http.Request) *Session {
+	sess, ok := r.Context().Value(SessionKey).(*Session)
+	if !ok || sess == nil {
+		panic("context doesn't hold session")
+	}
+	return sess
+}
+
+func MustGetSessionID(r *http.Request) string {
+	sess, ok := r.Context().Value(SessionKey).(*Session)
+	if ok && sess == nil {
+		panic("context doesn't hold session")
+	} else if ok {
+		return sess.ID
+	}
+	shop := r.Header.Get(XDomainHeader)
+	if shop == "" {
+		panic("context doesn't hold session")
+	}
+	return GetOfflineSessionID(shop)
+}
+
+func GetLogger(r *http.Request) *log.Logger {
+	return r.Context().Value(LoggerKey).(*log.Logger)
+}
+
+func GetSession(r *http.Request) *Session {
+	return r.Context().Value(SessionKey).(*Session)
 }

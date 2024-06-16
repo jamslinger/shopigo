@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"strings"
 	"time"
 )
@@ -62,64 +61,4 @@ func GetOfflineSessionID(shop string) string {
 
 func GetShopFromOfflineSessionID(id string) string {
 	return strings.TrimPrefix(id, "offline_")
-}
-
-func MustGetShopSession(c *gin.Context) *Session {
-	sess, ok := c.Get(ShopSessionKey)
-	if !ok {
-		panic("context doesn't hold session")
-	}
-	s, ok := sess.(*Session)
-	if !ok {
-		panic("context doesn't hold session")
-
-	}
-	return s
-}
-
-func MustGetSessionID(c *gin.Context) string {
-	sess, ok := c.Get(ShopSessionKey)
-	if ok {
-		if s, ok := sess.(*Session); ok {
-			return s.ID
-		}
-		panic("context doesn't hold session")
-	}
-	shop := c.GetHeader(XDomainHeader)
-	if shop == "" {
-		panic("context doesn't hold session")
-	}
-	return GetOfflineSessionID(shop)
-}
-
-func GetShop(c *gin.Context) (string, error) {
-	sess, ok := c.Get(ShopSessionKey)
-	if !ok {
-		shop := c.GetHeader(XDomainHeader)
-		if shop == "" {
-			return "", errors.New("context doesn't hold session")
-		}
-		return shop, nil
-	}
-	s, ok := sess.(*Session)
-	if !ok {
-		return "", errors.New("context doesn't hold session")
-	}
-	return s.Shop, nil
-}
-
-func GetShopID(c *gin.Context) (string, error) {
-	shop, err := GetShop(c)
-	if err != nil {
-		panic(err)
-	}
-	return GetOfflineSessionID(shop), nil
-}
-
-func MustGetShop(c *gin.Context) string {
-	shop, err := GetShop(c)
-	if err != nil {
-		panic(err)
-	}
-	return shop
 }

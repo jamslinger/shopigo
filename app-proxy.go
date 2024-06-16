@@ -6,41 +6,42 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	log "log/slog"
 	"net/http"
 )
 
-func (a *App) VerifyAppProxyRequest(c *gin.Context) {
-	shop := c.Query("shop")
+func (a *App) VerifyAppProxyRequest(w http.ResponseWriter, r *http.Request) error {
+	q := r.URL.Query()
+	shop := q.Get("shop")
 	logger := a.Logger.With(log.String("shop", shop))
 	logger.Debug("verifying app proxy request")
 
 	sorted := fmt.Sprintf("logged_in_customer_id=%spath_prefix=%sshop=%stimestamp=%s",
-		c.Query("logged_in_customer_id"),
-		c.Query("path_prefix"),
+		q.Get("logged_in_customer_id"),
+		q.Get("path_prefix"),
 		shop,
-		c.Query("timestamp"),
+		q.Get("timestamp"),
 	)
 	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
 	hash.Write([]byte(sorted))
 	calcSignature := []byte(hex.EncodeToString(hash.Sum(nil)))
-	signature := []byte(c.Query("signature"))
+	signature := []byte(r.URL.Query().Get("signature"))
 
 	logger.Debug("checking hmac signature")
 	if !hmac.Equal(calcSignature, signature) {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("hmac signature mismatch"))
-		return
+		w.WriteHeader(http.StatusUnauthorized)
+		return errors.New("hmac signature mismatch")
 	}
 
 	logger.Debug("retrieving session")
-	sess, err := a.SessionStore.Get(c.Request.Context(), shop)
+	sess, err := a.SessionStore.Get(r.Context(), shop)
 	if IsNotFound(err) {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("session not found"))
-		return
+		w.WriteHeader(http.StatusUnauthorized)
+		return errors.New("session not found")
 	} else if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, fmt.Errorf("failed to retrieve session for: %w", err))
-		return
+		w.WriteHeader(http.StatusInternalServerError)
+		return fmt.Errorf("failed to retrieve session for: %w", err)
 	}
-	c.Set(ShopSessionKey, sess)
+	setSession(r, sess)
+	return nil
 }

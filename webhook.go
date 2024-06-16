@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
 	"net/url"
@@ -137,21 +136,24 @@ func (c *client) DeleteWebhook(ctx context.Context, id int) error {
 	return nil
 }
 
-func (a *App) VerifyWebhook(c *gin.Context) {
+func (a *App) VerifyWebhook(w http.ResponseWriter, r *http.Request) {
 	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
-	bs, err := io.ReadAll(c.Request.Body)
+	bs, err := io.ReadAll(r.Body)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		AbortWithError(r, errors.New("failed to read webhook body"))
 		return
 	}
 	if _, err = hash.Write(bs); err != nil {
-		_ = c.AbortWithError(http.StatusUnauthorized, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		AbortWithError(r, errors.New("failed to verify webhook hmac"))
 		return
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(bs))
+	r.Body = io.NopCloser(bytes.NewReader(bs))
 	mac := base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	if !hmac.Equal([]byte(mac), []byte(c.GetHeader(XHmacHeader))) {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
+	if !hmac.Equal([]byte(mac), []byte(r.Header.Get(XHmacHeader))) {
+		w.WriteHeader(http.StatusUnauthorized)
+		AbortWithError(r, errors.New("invalid webhook header"))
 		return
 	}
 }
