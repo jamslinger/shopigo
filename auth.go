@@ -280,7 +280,7 @@ func (a *App) createSession(shop string, state string, token *AccessToken) *Sess
 		State:       state,
 		AccessToken: token.Token,
 		Scopes:      token.Scopes,
-		Expires:     &time.Time{}, // TODO: should this expire?
+		Expires:     nil, // TODO: should this expire?
 	}
 }
 
