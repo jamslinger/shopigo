@@ -130,8 +130,11 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 func (a *App) ValidateHMAC(c *gin.Context) {
 	hmacHeader := c.GetHeader(XHmacHeader)
 	if hmacHeader == "" {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.New("HMAC header missing"))
-		return
+		hmacHeader = c.Query("hmac")
+		if hmacHeader == "" {
+			_ = c.AbortWithError(http.StatusBadRequest, errors.New("HMAC header missing"))
+			return
+		}
 	}
 	bs, err := io.ReadAll(c.Request.Body)
 	if err != nil {
