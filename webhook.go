@@ -138,22 +138,31 @@ func (c *client) DeleteWebhook(ctx context.Context, id int) error {
 }
 
 func (a *App) VerifyWebhook(c *gin.Context) {
-	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
+	hmacHeader := c.GetHeader(XHmacHeader)
+	if hmacHeader == "" {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("HMAC header missing"))
+		return
+	}
+
 	bs, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(bs))
+
+	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
 	if _, err = hash.Write(bs); err != nil {
-		_ = c.AbortWithError(http.StatusUnauthorized, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(bs))
 	mac := base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	if !hmac.Equal([]byte(mac), []byte(c.GetHeader(XHmacHeader))) {
+
+	if !hmac.Equal([]byte(mac), []byte(hmacHeader)) {
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
 		return
 	}
+
 	id := MustGetSessionID(c)
 	sess, err := a.SessionStore.Get(c.Request.Context(), MustGetSessionID(c))
 	if err != nil {
