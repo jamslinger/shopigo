@@ -154,4 +154,10 @@ func (a *App) VerifyWebhook(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
 		return
 	}
+	id := MustGetSessionID(c)
+	sess, err := a.SessionStore.Get(c.Request.Context(), MustGetSessionID(c))
+	if err != nil {
+		panic(fmt.Sprintf("webhook session retrieval failed for %q", id))
+	}
+	c.Set(ShopSessionKey, sess)
 }
