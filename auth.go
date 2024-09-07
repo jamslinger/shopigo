@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -126,30 +125,25 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 }
 
 func (a *App) ValidateHMAC(c *gin.Context) {
-	hmacQuery, rest := parseHMAC(c.Request.URL.Query())
-	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
-	if _, err := hash.Write([]byte(rest)); err != nil {
+	q := c.Request.URL.Query()
+	h, err := hex.DecodeString(q.Get("hmac"))
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, err)
+	}
+	q.Del("hmac")
+	msg, err := url.QueryUnescape(q.Encode())
+	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	if !hmac.Equal(hash.Sum(nil), []byte(hmacQuery)) {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
+
+	mac := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
+	mac.Write([]byte(msg))
+
+	if !hmac.Equal(h, mac.Sum(nil)) {
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid hmac signature"))
 		return
 	}
-}
-
-func parseHMAC(query url.Values) (string, string) {
-	h := query.Get("hmac")
-	query.Del("hmac")
-	var kvs []string
-	for k, v := range query {
-		slices.Sort(v)
-		for i := range v {
-			kvs = append(kvs, fmt.Sprintf("%s=%s", k, v[i]))
-		}
-	}
-	slices.Sort(kvs)
-	return h, strings.Join(kvs, "&")
 }
 
 func (a *App) Begin(c *gin.Context) {
