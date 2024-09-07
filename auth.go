@@ -1,7 +1,6 @@
 package shopigo
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"io"
 	log "log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -128,27 +127,25 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 }
 
 func (a *App) ValidateHMAC(c *gin.Context) {
-	hmacHeader := c.GetHeader(XHmacHeader)
-	if hmacHeader == "" {
-		hmacHeader = c.Query("hmac")
-		if hmacHeader == "" {
-			_ = c.AbortWithError(http.StatusBadRequest, errors.New("HMAC header missing"))
-			return
+	query := c.Request.URL.Query()
+	hmacQuery := query.Get("hmac")
+	query.Del("hmac")
+	var kvs []string
+	for k, v := range query {
+		slices.Sort(v)
+		for i := range v {
+			kvs = append(kvs, fmt.Sprintf("%s=%s", k, v[i]))
 		}
 	}
-	bs, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(bs))
+	slices.Sort(kvs)
+
 	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
-	if _, err = hash.Write(bs); err != nil {
+	if _, err := hash.Write([]byte(strings.Join(kvs, "&"))); err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	mac := base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	if !hmac.Equal([]byte(mac), []byte(hmacHeader)) {
+	if !hmac.Equal([]byte(mac), []byte(hmacQuery)) {
 		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
 		return
 	}
