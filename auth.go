@@ -3,7 +3,6 @@ package shopigo
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -127,8 +126,20 @@ func (a *App) ValidateAuthenticatedSession(c *gin.Context) {
 }
 
 func (a *App) ValidateHMAC(c *gin.Context) {
-	query := c.Request.URL.Query()
-	hmacQuery := query.Get("hmac")
+	hmacQuery, rest := parseHMAC(c.Request.URL.Query())
+	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
+	if _, err := hash.Write([]byte(rest)); err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	if !hmac.Equal(hash.Sum(nil), []byte(hmacQuery)) {
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
+		return
+	}
+}
+
+func parseHMAC(query url.Values) (string, string) {
+	h := query.Get("hmac")
 	query.Del("hmac")
 	var kvs []string
 	for k, v := range query {
@@ -138,17 +149,7 @@ func (a *App) ValidateHMAC(c *gin.Context) {
 		}
 	}
 	slices.Sort(kvs)
-
-	hash := hmac.New(sha256.New, []byte(a.Credentials.ClientSecret))
-	if _, err := hash.Write([]byte(strings.Join(kvs, "&"))); err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	mac := base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	if !hmac.Equal([]byte(mac), []byte(hmacQuery)) {
-		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("invalid webhook header"))
-		return
-	}
+	return h, strings.Join(kvs, "&")
 }
 
 func (a *App) Begin(c *gin.Context) {
