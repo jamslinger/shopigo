@@ -25,18 +25,26 @@ func (v Version) String() string {
 }
 
 func (v Version) Values() (vals []string) {
-	for _, val := range []Version{VLatest, V202407, V202404, V202401, V202310} {
+	for _, val := range []Version{
+		VLatest,
+		V202410,
+		V202407,
+		V202404,
+		V202401,
+		V202310,
+	} {
 		vals = append(vals, string(val))
 	}
 	return
 }
 
 func (v Version) Latest() Version {
-	return V202407
+	return V202410
 }
 
 const (
 	VLatest Version = "Latest"
+	V202410 Version = "2024-10"
 	V202407 Version = "2024-07"
 	V202404 Version = "2024-04"
 	V202401 Version = "2024-01"
